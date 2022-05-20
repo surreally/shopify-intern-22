@@ -6,12 +6,10 @@
   },
   "resources": [
     {
-      "resource": "item",
-      "route": "inventory"
+      "resource": "item"
     },
     {
-      "resource": "warehouse",
-      "route": "inventory"
+      "resource": "warehouse"
     }
   ]
 }

@@ -8,7 +8,7 @@ const database = conf.database
 const resources = conf.resources
 
 const indexRouter = require('./routes/index')
-const resourceRouter = require('./routes/resource')
+const resourceRouter = require('./routes/resources')
 
 const app = express()
 
