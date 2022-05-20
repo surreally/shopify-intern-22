@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser')
 const logger = require('morgan')
 const conf = require('./conf/conf.json')
 const database = conf.database
+const resources = conf.resources
 
 const indexRouter = require('./routes/index')
 const resourceRouter = require('./routes/resource')
@@ -19,6 +20,9 @@ app.set('view engine', 'pug')
 app.set('endpoint', app.get('env') === 'development'
   ? database.crudcrud + '/' + database.dev
   : database.crudcrud + '/' + database.prod)
+
+// resources setup
+app.set('resources', resources)
 
 app.use(logger('dev'))
 app.use(express.json())
@@ -44,7 +48,10 @@ app.use(function (err, req, res, next) {
 
   // render the error page
   res.status(err.status || 500)
-  res.render('error')
+  res.render('error', {
+    title: 'Error',
+    resources: req.app.get('resources')
+  })
 })
 
 module.exports = exports = app

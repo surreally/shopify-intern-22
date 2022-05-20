@@ -13,19 +13,20 @@ html(lang='en')
         div.col-sm-2
           block sidebar
             ul.sidebar-nav.mt-3.p-0(style='list-style: none')
-              //- TODO: obtain this from config
               li
                 a(href='/') Home
-              li
-                a(href='/item') Inventory
-              li
-                a(href='/warehouse') Warehouses
+              each category in resources
+                -
+                  const name = category.resource
+                  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1)
+                li
+                  a(href='/'+name) #{capitalizedName} list
               li
                 hr
-              li
-                a(href='/item/create') Create new inventory item
-              li
-                a(href='/warehouse/create') Create new warehouse
+              each category in resources
+                - const name = category.resource
+                li
+                  a(href='/'+name+'/create') Create new #{name}
 
         div.col-sm-10
           block content

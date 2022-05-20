@@ -12,10 +12,6 @@
     {
       "resource": "warehouse",
       "route": "inventory"
-    },
-    {
-      "resource": "unicorns",
-      "route": "inventory"
     }
   ]
 }

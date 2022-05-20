@@ -35,6 +35,7 @@ function readItem (req, res, next) {
     .then((reply) => { // object json
       res.render('detail', {
         title: 'Detail',
+        resources: req.app.get('resources'),
         url: req.originalUrl,
         details: reply.data
       })
@@ -50,6 +51,7 @@ function updateItem (req, res, next) {
       .then((reply) => { // object json
         res.render('edit', {
           title: 'Edit',
+          resources: req.app.get('resources'),
           url: req.originalUrl,
           details: reply.data
         })
@@ -90,6 +92,7 @@ function listItems (req, res, next) {
     .then((reply) => { // array of json objects
       res.render('list', {
         title: 'List',
+        resources: req.app.get('resources'),
         url: req.originalUrl,
         items: reply.data
       })
