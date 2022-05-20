@@ -2,7 +2,7 @@
   "database": {
     "crudcrud": "https://crudcrud.com/api",
     "prod": "6bf79a5603cc4762b1e379be94b0bb3e",
-    "dev": "64e6d4873cd04584bcb10aa5d8e3189c"
+    "dev": "101d426af05b43bd93aff1748c721856"
   },
   "resources": [
     {

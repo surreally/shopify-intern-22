@@ -1,0 +1,22 @@
+extends layout
+
+block content
+  h1= title
+
+  form.mb-3(method='POST', action='')
+    button.btn.btn-primary.mb-3(type='submit') Submit
+
+    - var detailArray = Object.entries(details)
+      each detail in detailArray
+        div.mb-3
+          if detail[0] === '_id'
+            span #[strong #{detail[0]}]
+            p #{detail[1]}
+          else
+            label(for=detail[0],
+                  style='display: block') #[strong #{detail[0]}]
+            input(id=detail[0],
+                  type='text',
+                  name=detail[0],
+                  required='true',
+                  value=detail[1])

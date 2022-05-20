@@ -1,0 +1,16 @@
+extends layout
+
+block content
+  h1= title
+
+  each item in items
+    hr
+    - var detailArray = Object.entries(item)
+      each detail in detailArray
+        div.mb-3
+          if detail[0] === '_id'
+            a(href=url+'/'+item._id)
+              span #[strong #{detail[0]}]
+          else
+            span #[strong #{detail[0]}]
+          p #{detail[1]}
