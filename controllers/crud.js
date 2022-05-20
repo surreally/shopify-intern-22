@@ -36,7 +36,8 @@ function readItem (req, res, next) {
       res.render('detail', {
         title: 'Detail',
         resources: req.app.get('resources'),
-        url: req.originalUrl,
+        resource: req.baseUrl,
+        id: req.path,
         details: reply.data
       })
     })
@@ -52,7 +53,8 @@ function updateItem (req, res, next) {
         res.render('edit', {
           title: 'Edit',
           resources: req.app.get('resources'),
-          url: req.originalUrl,
+          resource: req.baseUrl,
+          id: req.params.id,
           details: reply.data
         })
       })

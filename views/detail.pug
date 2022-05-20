@@ -1,11 +1,12 @@
 extends layout
 
 block content
-  h1= title
+  - const name = resource.slice(resource.search(/\w/g))
+  h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
 
   div.mb-3
-    a.btn.btn-primary.me-3(href=url+'/edit') Edit
-  form.mb-3(method='POST', action=url+'/delete')
+    a.btn.btn-primary.me-3(href=resource+id+'/edit') Edit
+  form.mb-3(method='POST', action=resource+id+'/delete')
     button.btn.btn-primary.me-3(type='submit') Delete
 
   - var detailArray = Object.entries(details)
