@@ -17,4 +17,7 @@ router.delete('/:id', api.delete)
 // list all items
 router.get('/', api.list)
 
+// handle error from database
+router.use(api.error)
+
 module.exports = exports = router

@@ -3,10 +3,10 @@ const express = require('express')
 const path = require('path')
 const cookieParser = require('cookie-parser')
 const logger = require('morgan')
+const conf = require('./conf/conf.json')
+const database = conf.database
 
 const indexRouter = require('./routes/index')
-// const usersRouter = require('./routes/users')
-// const inventoryRouter = require('./routes/inventory')
 const resourceRouter = require('./routes/resource')
 
 const app = express()
@@ -14,6 +14,11 @@ const app = express()
 // view engine setup
 app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'pug')
+
+// database setup
+app.set('endpoint', app.get('env') === 'development'
+  ? database.crudcrud + '/' + database.dev
+  : database.crudcrud + '/' + database.prod)
 
 app.use(logger('dev'))
 app.use(express.json())
@@ -25,7 +30,6 @@ app.use(express.static(path.join(__dirname, 'public')))
 app.use(resourceRouter)
 
 app.use('/', indexRouter)
-// app.use('/users', usersRouter)
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
