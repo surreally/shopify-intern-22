@@ -1,9 +1,6 @@
-const crudcrud = 'https://crudcrud.com/api'
-const inventoryInstance = '6bf79a5603cc4762b1e379be94b0bb3e'
-const endpoint = crudcrud + '/' + inventoryInstance
-// dev
-const unicornsInstance = '64e6d4873cd04584bcb10aa5d8e3189c'
-const toyEndpoint = crudcrud + '/' + unicornsInstance
+const axios = require('axios')
+const conf = require('../conf/conf.json')
+const database = conf.database
 
 exports.create = createItem
 
@@ -17,12 +14,34 @@ exports.list = listItems
 
 module.exports = exports
 
+// utilities
+
+// note: req.baseUrl is of the form '/item'
+
+const toyEndpoint = database.crudcrud + '/' + database.dev
+const endpoint = process.env.NODE_ENV === 'development'
+  ? toyEndpoint
+  : database.crudcrud + '/' + database.prod
+
 function createItem (req, res, next) {
-  res.send('Not implemented: create')
+  axios.post(endpoint + req.baseUrl, req.body)
+    .then((reply) => {
+      // echo back object created
+      res.json(reply.data)
+    })
+    .catch((err) => {
+      next(err)
+    })
 }
 
 function readItem (req, res, next) {
-  res.send('Not implemented: read ' + req.params.id)
+  axios.get(endpoint + req.baseUrl + '/' + req.params.id)
+    .then((reply) => {
+      res.json(reply.data)
+    })
+    .catch((err) => {
+      next(err)
+    })
 }
 
 function updateItem (req, res, next) {
@@ -30,9 +49,21 @@ function updateItem (req, res, next) {
 }
 
 function deleteItem (req, res, next) {
-  res.send('Not implemented: delete')
+  axios.delete(endpoint + req.baseUrl + '/' + req.params.id)
+    .then((reply) => {
+      res.json(reply.data)
+    })
+    .catch((err) => {
+      next(err)
+    })
 }
 
 function listItems (req, res, next) {
-  res.send('Not implemented: list')
+  axios.get(toyEndpoint + req.baseUrl)
+    .then((reply) => {
+      res.json(reply.data)
+    })
+    .catch((err) => {
+      next(err)
+    })
 }
