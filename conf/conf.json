@@ -6,10 +6,35 @@
   },
   "resources": [
     {
-      "resource": "item"
+      "category": "item",
+      "attributes": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "quantity",
+          "type": "number"
+        }
+      ]
     },
     {
-      "resource": "warehouse"
+      "category": "warehouse",
+      "attributes": [
+        {
+          "name": "location",
+          "type": "string"
+        },
+        {
+          "name": "climateControl",
+          "type": "boolean"
+        }
+      ]
     }
-  ]
+  ],
+  "resourceAttributeTypes": {
+    "string": "text",
+    "number": "number",
+    "boolean": "checkbox"
+  }
 }

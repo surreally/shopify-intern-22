@@ -15,18 +15,18 @@ html(lang='en')
             ul.sidebar-nav.mt-3.p-0(style='list-style: none')
               li
                 a(href='/') Home
-              each category in resources
+              each resource in resources
                 -
-                  const name = category.resource
+                  const name = resource.category
                   const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1)
                 li
                   a(href='/'+name) #{capitalizedName} list
               li
                 hr
-              each category in resources
-                - const name = category.resource
+              each resource in resources
+                - const name = resource.category
                 li
-                  a(href='/'+name+'/create') Create new #{name}
+                  a(href='/'+name+'/new') New #{name}
 
         div.col-sm-10
           block content

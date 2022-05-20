@@ -6,6 +6,7 @@ const logger = require('morgan')
 const conf = require('./conf/conf.json')
 const database = conf.database
 const resources = conf.resources
+const resourceAttributeTypes = conf.resourceAttributeTypes
 
 const indexRouter = require('./routes/index')
 const resourceRouter = require('./routes/resources')
@@ -23,6 +24,7 @@ app.set('endpoint', app.get('env') === 'development'
 
 // resources setup
 app.set('resources', resources)
+app.set('resourceAttributeTypes', resourceAttributeTypes)
 
 app.use(logger('dev'))
 app.use(express.json())

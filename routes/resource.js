@@ -3,7 +3,8 @@ const router = express.Router()
 const api = require('../controllers/crud')
 
 // create item
-router.post('/', api.create)
+router.get('/new', api.create)
+router.post('/new', api.create)
 
 // read item
 router.get('/:id', api.read)

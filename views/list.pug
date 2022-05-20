@@ -1,17 +1,17 @@
 extends layout
 
 block content
-  - const name = url.slice(url.search(/\w/g))
+  - const name = category.slice(category.search(/\w/g))
   h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
 
-  each item in items
+  each entry in inventory
     hr
-    - var detailArray = Object.entries(item)
-      each detail in detailArray
-        div.mb-3
-          span #[strong #{detail[0]}]
-          if detail[0] === '_id'
-            a.d-block(href=url+'/'+item._id)
-              span #{detail[1]}
-          else
-            p #{detail[1]}
+    - const detailArray = Object.entries(entry)
+    each detail in detailArray
+      div.mb-3
+        span #[strong #{detail[0]}]
+        if detail[0] === '_id'
+          a.d-block(href=category+'/'+entry._id)
+            span #{detail[1]}
+        else
+          p #{detail[1]}

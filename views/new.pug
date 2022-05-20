@@ -1,0 +1,26 @@
+extends layout
+
+block content
+  //- title, resources, resourceAttributeTypes, category
+  - const name = category.slice(category.search(/\w/g))
+  h1= title + ' ' + name
+
+  form.mb-3(method='POST', action='')
+    button.btn.btn-primary.mb-3(type='submit') Submit
+
+    -
+      const resource = resources.find(resource => resource.category === name)
+      const attributes = resource.attributes
+      const attrTypeMap = resourceAttributeTypes
+    each attribute in attributes
+      div.mb-3
+        label.d-block(for=attribute.name) #[strong #{attribute.name}]
+        if attribute.type !== 'boolean'
+          input(id=attribute.name,
+                type=attrTypeMap[attribute.type],
+                name=attribute.name,
+                required)
+        else
+          input(id=attribute.name,
+                type=attrTypeMap[attribute.type],
+                name=attribute.name)
