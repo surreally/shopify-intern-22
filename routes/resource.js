@@ -5,7 +5,8 @@ const api = require('../controllers/crud')
 // create item
 router.get('/new', api.create)
 router.post('/new',
-  api.sanitizeAttributeTypes,
+  api.escape,
+  api.sanitize,
   api.create)
 
 // read item
@@ -14,10 +15,12 @@ router.get('/:id', api.read)
 // update item
 router.get('/:id/edit', api.update)
 router.post('/:id/edit',
-  api.sanitizeAttributeTypes,
+  api.escape,
+  api.sanitize,
   api.update)
 router.put('/:id/edit',
-  api.sanitizeAttributeTypes,
+  api.escape,
+  api.sanitize,
   api.update)
 
 // delete item

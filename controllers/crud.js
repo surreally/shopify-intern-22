@@ -1,7 +1,7 @@
 const axios = require('axios')
 const createError = require('http-errors')
-const qs = require('qs')
 const queryType = require('query-types')
+const validator = require('validator')
 
 exports.create = createItem
 
@@ -13,17 +13,17 @@ exports.delete = deleteItem
 
 exports.list = listItems
 
-exports.error = handleAxiosError
+exports.error = handleError
 
-exports.sanitizeAttributeTypes = sanitizeAttributeTypes
+exports.escape = escapeInputs
+
+exports.sanitize = sanitizeAttributeTypes
 
 module.exports = exports
 
 // utilities
 
 // note: req.baseUrl is of the form '/item'
-
-// TODO: refactor attribute type validation
 
 function createItem (req, res, next) {
   if (req.method === 'GET') {
@@ -127,7 +127,10 @@ function listItems (req, res, next) {
     .catch(next)
 }
 
-function handleAxiosError (error, req, res, next) {
+function handleError (error, req, res, next) {
+  // if (createError.isHttpError(error)) return next(error)
+  // - somehow this fails: "createError.isHttpError is a property", not a function
+  if (error instanceof createError.HttpError) return next(error)
   // https://axios-http.com/docs/handling_errors
   if (error.response) {
     const err = createError(error.response.status)
@@ -137,27 +140,42 @@ function handleAxiosError (error, req, res, next) {
     const err = createError(400)
     return next(err)
   } else {
-    const err = createError(error.message)
-    return next(err)
+    return next(error)
   }
+}
+
+// escape all names and values from request body json
+function escapeInputs (req, res, next) {
+  // request payload was json -> req.body has Object prototype
+  // request payload was urlencoded -> req.body has null prototype
+  // (I guess express.json() and express.urlencoded() have diff implementations)
+  const unescaped = Object.entries(req.body)
+  const escaped = Object.create(null)
+  unescaped.forEach(escapeProperty, escaped)
+  req.body = escaped
+  return next()
+}
+
+function escapeProperty ([key, value]) {
+  // for now, coerce every key and value into a string
+  this[validator.escape(key + '')] = validator.escape(value + '')
 }
 
 // enforce resource attribute types for POST and PUT inputs
 function sanitizeAttributeTypes (req, res, next) {
   if (req.method !== 'POST' && req.method !== 'PUT') return next()
 
-  const body = req.method === 'PUT'
-    ? req.body // json
-    : qs.parse(req.body) // urlencoded -> json
-  const typedBody = queryType.parseObject(body) // TODO: assess
+  const typedBody = queryType.parseObject(req.body) // TODO: assess use of qT
   const resources = req.app.get('resources')
   const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
+
   // keep attribute order
   const orderedBody = {}
   for (const attribute of attributes) {
     let value = typedBody[attribute.name]
+
     if (value === undefined && attribute.type !== 'boolean') {
       return next(createError(406))
     }
@@ -168,10 +186,10 @@ function sanitizeAttributeTypes (req, res, next) {
       return next(createError(406))
     }
     // attribute.type === 'string': pass
+
     orderedBody[attribute.name] = value
   }
 
-  // try: reassigning
   req.body = orderedBody
   return next()
 }
