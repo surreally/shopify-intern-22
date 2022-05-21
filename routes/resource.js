@@ -2,23 +2,26 @@ const express = require('express')
 const router = express.Router()
 const api = require('../controllers/crud')
 
-// sanitize inputs
-router.use(api.sanitizeAttributeTypes)
-
 // create item
 router.get('/new', api.create)
-router.post('/new', api.create)
+router.post('/new',
+  api.sanitizeAttributeTypes,
+  api.create)
 
 // read item
 router.get('/:id', api.read)
 
 // update item
 router.get('/:id/edit', api.update)
-router.post('/:id/edit', api.update)
-router.put('/:id/edit', api.update)
+router.post('/:id/edit',
+  api.sanitizeAttributeTypes,
+  api.update)
+router.put('/:id/edit',
+  api.sanitizeAttributeTypes,
+  api.update)
 
 // delete item
-router.post('/:id/delete', api.delete)
+router.post('/:id/delete', api.delete) // ignore request body
 router.delete('/:id', api.delete)
 
 // list all items
