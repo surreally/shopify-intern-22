@@ -3,7 +3,7 @@
 extends layout
 
 block content
-  //- title, resources, resourceAttributeTypes, category, details
+  //- title, resources, attributeTypes, category, details
   - const name = category.slice(category.search(/\w/g))
   h1= title + ' ' + name
 
@@ -12,7 +12,7 @@ block content
 
     - const resource = resources.find(resource => resource.category === name)
     - const attributes = resource.attributes
-    - const attrTypeMap = resourceAttributeTypes
+    - const attrTypeMap = attributeTypes
     each attribute in attributes
       - const value = details === undefined ? undefined : details[attribute.name]
       div.mb-3

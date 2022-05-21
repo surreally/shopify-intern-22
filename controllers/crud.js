@@ -34,7 +34,7 @@ function createItem (req, res, next) {
     res.render('edit', {
       title: 'New',
       resources: req.app.get('resources'),
-      resourceAttributeTypes: req.app.get('resourceAttributeTypes'),
+      attributeTypes: req.app.get('resourceAttributeTypes'),
       category: req.baseUrl
     })
   } else if (req.method === 'POST') {
@@ -75,7 +75,7 @@ function updateItem (req, res, next) {
         res.render('edit', {
           title: 'Edit',
           resources: req.app.get('resources'),
-          resourceAttributeTypes: req.app.get('resourceAttributeTypes'),
+          attributeTypes: req.app.get('resourceAttributeTypes'),
           category: req.baseUrl,
           details: reply.data
         })
@@ -151,14 +151,19 @@ function escapeInputs (req, res, next) {
   // (I guess express.json() and express.urlencoded() have diff implementations)
   const unescaped = Object.entries(req.body)
   const escaped = Object.create(null)
-  unescaped.forEach(escapeProperty, escaped)
+  // TODO: figure out hwo to move these out
+  unescaped.forEach(function escapeProperty (property) {
+    const [key, value] = property.map(function escapeField (field) {
+      // for now, coerce every key and value into a string
+      field = validator.trim(field + '')
+      if (!validator.isLength(field, { min: 1 })) return next(createError(406))
+      field = validator.escape(field)
+      return field
+    })
+    escaped[key] = value
+  })
   req.body = escaped
   return next()
-}
-
-function escapeProperty ([key, value]) {
-  // for now, coerce every key and value into a string
-  this[validator.escape(key + '')] = validator.escape(value + '')
 }
 
 // enforce resource attribute types for POST and PUT inputs
