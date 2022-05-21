@@ -15,7 +15,7 @@ inventory.
     - Kept as is for now
   - Resource list detail level (see Usage > List section)
 - Built with Express.js, Node.js, Bootstrap
-- 'Database' supported by crudcrud.com
+- 'Database' supported by [crudcrud.com](https://crudcrud.com)
   - See inventory [here](https://crudcrud.com/Dashboard/101d426af05b43bd93aff1748c721856)
   - See 'Database' section
 
@@ -44,6 +44,6 @@ As an example, if the desired resource is `item`:
     - Currently, it's limited to 3 details, including item ID's
 
 ## 'Database'
-The app makes calls to the CRUD API at crudcrud.com to simulate database operations.
+The app makes calls to the CRUD API at [crudcrud.com](https://crudcrud.com) to simulate database operations.
 
 The advantage is CrudCrud's data is very accessible. Verifying the correctness of the app becomes very easy. Downside is this app becomes somewhat redundant, but it's still a demonstration of a CRUD API. In a way, this app is a 'CRUD-CRUD'.
