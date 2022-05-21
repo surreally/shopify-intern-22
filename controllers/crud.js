@@ -188,11 +188,8 @@ function sanitizeAttributeTypes (req, res, next) {
       value = value !== undefined && value !== false
     } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
       return next(createError(406))
-    } else if (attribute.type === 'string' && typeof value !== 'string' && !(value instanceof String)) {
-      // above string test taken from:
-      // https://github.com/validatorjs/validator.js/blob/master/src/lib/util/assertString.js
-      // License (MIT): https://github.com/validatorjs/validator.js/blob/master/LICENSE
-      return next(createError(406))
+    } else if (attribute.type === 'string') {
+      value += ''
     }
 
     orderedBody[attribute.name] = value
