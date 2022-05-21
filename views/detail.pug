@@ -1,0 +1,16 @@
+extends layout
+
+block content
+  - const name = category.slice(category.search(/\w/g))
+  h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
+
+  div.mb-3
+    a.btn.btn-primary.me-3(href=category+id+'/edit') Edit
+  form.mb-3(method='POST', action=category+id+'/delete')
+    button.btn.btn-primary.me-3(type='submit') Delete
+
+  - const detailArray = Object.entries(details)
+  each detail in detailArray
+    div.mb-3
+      span #[strong #{detail[0]}]
+      p #{detail[1]}

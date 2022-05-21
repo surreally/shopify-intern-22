@@ -3,9 +3,11 @@ const express = require('express')
 const path = require('path')
 const cookieParser = require('cookie-parser')
 const logger = require('morgan')
+const conf = require('./conf/conf.json')
+const database = conf.database
 
 const indexRouter = require('./routes/index')
-const usersRouter = require('./routes/users')
+const resourceRouter = require('./routes/resources')
 
 const app = express()
 
@@ -13,14 +15,26 @@ const app = express()
 app.set('views', path.join(__dirname, 'views'))
 app.set('view engine', 'pug')
 
+// database setup
+app.set('endpoint', app.get('env') === 'development'
+  ? database.crudcrud + '/' + database.dev
+  : database.crudcrud + '/' + database.prod)
+
+// resources setup
+app.set('resources', conf.resources)
+app.set('resourceAttributeTypes', conf.resourceAttributeTypes)
+app.set('resourceListDetailLevel', conf.resourceListDetailLevel)
+
 app.use(logger('dev'))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 app.use(express.static(path.join(__dirname, 'public')))
 
+// resource api
+app.use(resourceRouter)
+
 app.use('/', indexRouter)
-app.use('/users', usersRouter)
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -35,7 +49,10 @@ app.use(function (err, req, res, next) {
 
   // render the error page
   res.status(err.status || 500)
-  res.render('error')
+  res.render('error', {
+    title: 'Error',
+    resources: req.app.get('resources')
+  })
 })
 
-module.exports = app
+module.exports = exports = app

@@ -1,0 +1,41 @@
+{
+  "database": {
+    "crudcrud": "https://crudcrud.com/api",
+    "prod": "101d426af05b43bd93aff1748c721856",
+    "dev": "101d426af05b43bd93aff1748c721856"
+  },
+  "resources": [
+    {
+      "category": "item",
+      "attributes": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "quantity",
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "category": "warehouse",
+      "attributes": [
+        {
+          "name": "location",
+          "type": "string"
+        },
+        {
+          "name": "climateControl",
+          "type": "boolean"
+        }
+      ]
+    }
+  ],
+  "resourceAttributeTypes": {
+    "string": "text",
+    "number": "number",
+    "boolean": "checkbox"
+  },
+  "resourceListDetailLevel": 3
+}

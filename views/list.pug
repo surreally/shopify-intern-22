@@ -1,0 +1,19 @@
+extends layout
+
+block content
+  //- title, resources, detailLevel, category, inventory
+  - const name = category.slice(category.search(/\w/g))
+  h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
+
+  each entry in inventory
+    hr
+    - const details = Object.entries(entry)
+    - const level = detailLevel <= 0 ? 1 : detailLevel
+    each detail in details.slice(0, level)
+      div.mb-3
+        span #[strong #{detail[0]}]
+        if detail[0] === '_id'
+          a.d-block(href=category+'/'+entry._id)
+            span #{detail[1]}
+        else
+          p #{detail[1]}

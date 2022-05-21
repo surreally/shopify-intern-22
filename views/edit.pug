@@ -1,0 +1,36 @@
+//- view for both create and update
+
+extends layout
+
+block content
+  //- title, resources, attributeTypes, category, details
+  - const name = category.slice(category.search(/\w/g))
+  h1= title + ' ' + name
+
+  form.mb-3(method='POST', action='')
+    button.btn.btn-primary.mb-3(type='submit') Submit
+
+    - const resource = resources.find(resource => resource.category === name)
+    - const attributes = resource.attributes
+    - const attrTypeMap = attributeTypes
+    each attribute in attributes
+      - const value = details === undefined ? undefined : details[attribute.name]
+      div.mb-3
+        label.d-block(for=attribute.name) #[strong #{attribute.name}]
+        if attribute.type !== 'boolean'
+          input(id=attribute.name,
+                type=attrTypeMap[attribute.type],
+                name=attribute.name,
+                value=(value === undefined? '' : value)
+                required)
+        else if value === true
+          input(id=attribute.name,
+                type=attrTypeMap[attribute.type],
+                name=attribute.name,
+                checked)
+                //- boolean: checked, optional
+        else
+          input(id=attribute.name,
+                type=attrTypeMap[attribute.type],
+                name=attribute.name)
+                //- boolean: unchecked, optional

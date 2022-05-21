@@ -105,3 +105,9 @@ dist
 
 # VSCode settings
 .vscode
+
+# TODO document
+TODO.md
+
+# macOS file system
+.DS_Store
