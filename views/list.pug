@@ -6,8 +6,8 @@ block content
 
   each entry in inventory
     hr
-    - const detailArray = Object.entries(entry)
-    each detail in detailArray
+    - const details = Object.entries(entry)
+    each detail in details.slice(0, 4)
       div.mb-3
         span #[strong #{detail[0]}]
         if detail[0] === '_id'
