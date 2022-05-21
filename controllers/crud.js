@@ -186,13 +186,12 @@ function sanitizeAttributeTypes (req, res, next) {
     }
     if (attribute.type === 'boolean') {
       value = value !== undefined && value !== false
-    }
-    if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
+    } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
       return next(createError(406))
-    }
-    // https://github.com/validatorjs/validator.js/blob/master/src/lib/util/assertString.js
-    // License (MIT): https://github.com/validatorjs/validator.js/blob/master/LICENSE
-    if (attribute.type === 'string' && typeof value !== 'string' && !(value instanceof String)) {
+    } else if (attribute.type === 'string' && typeof value !== 'string' && !(value instanceof String)) {
+      // above string test taken from:
+      // https://github.com/validatorjs/validator.js/blob/master/src/lib/util/assertString.js
+      // License (MIT): https://github.com/validatorjs/validator.js/blob/master/LICENSE
       return next(createError(406))
     }
 
