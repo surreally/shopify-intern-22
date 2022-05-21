@@ -34,7 +34,7 @@ As an example, if the desired resource is `item`:
 - Update
   - `GET /item/${id}/edit` renders page to update the item, prefilled with current details of the item
     - This page displays a form, therefore it sends a `POST /item/${id}/edit ...` request to update the item, which is handled by the server
-  - `PUT /item/${id}/edit` directly sends a request to update the item
+  - `PUT /item/${id}` directly sends a request to update the item
 - Delete
   - `POST /item/${id}/delete` sends a request to delete the item
     - This is reached from the item detail page in the browser
