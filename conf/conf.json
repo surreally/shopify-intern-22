@@ -36,5 +36,6 @@
     "string": "text",
     "number": "number",
     "boolean": "checkbox"
-  }
+  },
+  "resourceListDetailLevel": 3
 }

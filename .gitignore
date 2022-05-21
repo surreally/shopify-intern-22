@@ -108,3 +108,6 @@ dist
 
 # TODO document
 TODO.md
+
+# macOS file system
+.DS_Store

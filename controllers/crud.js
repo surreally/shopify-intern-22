@@ -120,6 +120,7 @@ function listItems (req, res, next) {
       res.render('list', {
         title: 'List',
         resources: req.app.get('resources'),
+        detailLevel: req.app.get('resourceListDetailLevel'),
         category: req.originalUrl,
         inventory: reply.data
       })
