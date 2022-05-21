@@ -15,6 +15,8 @@ exports.list = listItems
 
 exports.error = handleAxiosError
 
+exports.sanitizeAttributeTypes = sanitizeAttributeTypes
+
 module.exports = exports
 
 // utilities
@@ -36,33 +38,9 @@ function createItem (req, res, next) {
       category: req.baseUrl
     })
   } else if (req.method === 'POST') {
-    // verify attribute values' types
-    const body = qs.parse(req.body) // urlencoded -> json
-    const typedBody = queryType.parseObject(body) // TODO: assess
-    const resources = req.app.get('resources')
-    const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
-    const resource = resources.find(resource => resource.category === category)
-    const attributes = resource.attributes
-    // keep attribute order
-    const orderedBody = {}
-    for (const attribute of attributes) {
-      let value = typedBody[attribute.name]
-      if (value === undefined && attribute.type !== 'boolean') {
-        return next(createError(406))
-      }
-      if (attribute.type === 'boolean') {
-        value = value !== undefined && value !== false
-      }
-      if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
-        return next(createError(406))
-      }
-      // attribute.type === 'string': pass
-      orderedBody[attribute.name] = value
-    }
-
     // create item in database
     const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.post(endpoint, orderedBody)
+    axios.post(endpoint, req.body)
       .then((reply) => { // object json
         res.redirect(req.baseUrl + '/' + reply.data._id)
       })
@@ -88,8 +66,6 @@ function readItem (req, res, next) {
     .catch(next)
 }
 
-// TODO: escape inputs, check if fields are existing
-//       - for now fields are defined in conf and enforced in Create
 function updateItem (req, res, next) {
   if (req.method === 'GET') {
     // read item to update from database
@@ -106,65 +82,17 @@ function updateItem (req, res, next) {
       })
       .catch(next)
   } else if (req.method === 'POST') {
-    // verify attribute values' types
-    const body = qs.parse(req.body) // urlencoded -> json
-    const typedBody = queryType.parseObject(body) // TODO: assess
-    const resources = req.app.get('resources')
-    const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
-    const resource = resources.find(resource => resource.category === category)
-    const attributes = resource.attributes
-    // keep attribute order
-    const orderedBody = {}
-    for (const attribute of attributes) {
-      let value = typedBody[attribute.name]
-      if (value === undefined && attribute.type !== 'boolean') {
-        return next(createError(406))
-      }
-      if (attribute.type === 'boolean') {
-        value = value !== undefined && value !== false
-      }
-      if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
-        return next(createError(406))
-      }
-      // attribute.type === 'string': pass
-      orderedBody[attribute.name] = value
-    }
-
     // update item in database
     const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.put(endpoint + '/' + req.params.id, orderedBody)
+    axios.put(endpoint + '/' + req.params.id, req.body)
       .then((reply) => { // empty
         res.redirect(req.baseUrl + '/' + req.params.id)
       })
       .catch(next)
   } else if (req.method === 'PUT') {
-    // verify attribute values' types
-    const body = req.body // json
-    const typedBody = queryType.parseObject(body) // TODO: assess
-    const resources = req.app.get('resources')
-    const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
-    const resource = resources.find(resource => resource.category === category)
-    const attributes = resource.attributes
-    // keep attribute order
-    const orderedBody = {}
-    for (const attribute of attributes) {
-      let value = typedBody[attribute.name]
-      if (value === undefined && attribute.type !== 'boolean') {
-        return next(createError(406))
-      }
-      if (attribute.type === 'boolean') {
-        value = value !== undefined && value !== false
-      }
-      if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
-        return next(createError(406))
-      }
-      // attribute.type === 'string': pass
-      orderedBody[attribute.name] = value
-    }
-
     // update item in database
     const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.put(endpoint + '/' + req.params.id, orderedBody)
+    axios.put(endpoint + '/' + req.params.id, req.body)
       .then((reply) => { // empty
         res.redirect(req.baseUrl + '/' + req.params.id)
       })
@@ -212,4 +140,38 @@ function handleAxiosError (error, req, res, next) {
     const err = createError(error.message)
     return next(err)
   }
+}
+
+// enforce resource attribute types for POST and PUT inputs
+function sanitizeAttributeTypes (req, res, next) {
+  if (req.method !== 'POST' && req.method !== 'PUT') return next()
+
+  const body = req.method === 'PUT'
+    ? req.body // json
+    : qs.parse(req.body) // urlencoded -> json
+  const typedBody = queryType.parseObject(body) // TODO: assess
+  const resources = req.app.get('resources')
+  const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+  // keep attribute order
+  const orderedBody = {}
+  for (const attribute of attributes) {
+    let value = typedBody[attribute.name]
+    if (value === undefined && attribute.type !== 'boolean') {
+      return next(createError(406))
+    }
+    if (attribute.type === 'boolean') {
+      value = value !== undefined && value !== false
+    }
+    if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
+      return next(createError(406))
+    }
+    // attribute.type === 'string': pass
+    orderedBody[attribute.name] = value
+  }
+
+  // try: reassigning
+  req.body = orderedBody
+  return next()
 }

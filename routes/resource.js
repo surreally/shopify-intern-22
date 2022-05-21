@@ -2,6 +2,9 @@ const express = require('express')
 const router = express.Router()
 const api = require('../controllers/crud')
 
+// sanitize inputs
+router.use(api.sanitizeAttributeTypes)
+
 // create item
 router.get('/new', api.create)
 router.post('/new', api.create)
