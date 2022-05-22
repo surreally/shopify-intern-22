@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node ./bin/www",
     "devstart": "nodemon ./bin/www",
-    "serverstart": "DEBUG=shopify-intern-22:* npm run devstart"
+    "serverstart": "DEBUG=shopify-intern-22:* npm run devstart",
+    "prodstart": "NODE_ENV=production npm start"
   },
   "dependencies": {
     "async": "^3.2.3",

@@ -25,18 +25,33 @@ module.exports = exports
 
 // note: req.baseUrl is of the form '/item'
 
-function createItem (req, res, next) {
+async function createItem (req, res, next) {
   if (req.method === 'GET') {
     // TODO: enable warehouse assignment
-    // const endpoint = req.app.get('endpoint') + req.baseUrl
+    const endpoint = req.app.get('endpoint')
+    const resources = req.app.get('resources')
+    const categoryUrl = req.baseUrl
+    const category = categoryUrl.slice(categoryUrl.search(/\w/g))
 
-    // create item in database
-    res.render('edit', {
-      title: 'New',
-      resources: req.app.get('resources'),
-      attributeTypes: req.app.get('resourceAttributeTypes'),
-      category: req.baseUrl
-    })
+    try {
+      const databases = await getDatabases(category, resources, endpoint)
+      // - consider making it optional: item can be created w/o warehouse at first?
+      // // debug
+      // console.log(databases)
+      // console.log(databases.warehouse[0])
+      // return next(createError(503))
+
+      // create item in database
+      res.render('edit', {
+        title: 'New',
+        resources,
+        attributeTypes: req.app.get('resourceAttributeTypes'),
+        category,
+        databases // if any attribute is itself database
+      })
+    } catch (err) {
+      return next(err)
+    }
   } else if (req.method === 'POST') {
     // create item in database
     const endpoint = req.app.get('endpoint') + req.baseUrl
@@ -47,6 +62,55 @@ function createItem (req, res, next) {
       .catch(next)
   } else {
     return next(createError(400))
+  }
+}
+
+// TODO: refactor
+async function getDatabases (category, resources, endpoint) {
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+  const databases = {}
+  for (const { name, type } of attributes) {
+    if (type !== 'database') continue
+    // attribute's type is database
+
+    // get database
+    const databaseEndpoint = endpoint + '/' + name
+    const reply = await axios.get(databaseEndpoint) // list inventory of database, e.g. warehouse
+    const inventory = reply.data
+
+    // determine the one display attribute besides id: at most two levels of detail
+    const dbResource = resources.find(resource => resource.category === name)
+    // const displayAttributes = ['_id'] // ASSUME: (crudcrud) database generates ID's as '_id'
+    /* tentative strategy for finding display attribute: type is string
+        * - matches 'name', 'location', etc. attributes
+        * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
+        *   - short, identifiable attributes should be defined early in configuration
+        */
+    const displayAttribute = dbResource.attributes.find(attr => attr.type === 'string')
+    // if (displayAttribute !== undefined) { // ASSUME: found suitable
+    //   displayAttributes.push(displayAttribute.name)
+    // } // else: no string type attribute was defined for this other resource, use ID
+
+    // get options to display
+    const display = []
+    for (const entry of inventory) {
+      const option = {}
+      // displayAttributes.forEach(function getOptionDetail (attr) {
+      //   option[attr] = entry[attr]
+      // })
+      option.id = entry._id
+      if (displayAttribute !== undefined) {
+        // const identifier = {}
+        // identifier[displayAttribute.name] = entry[displayAttribute.name]
+        // option.display = identifier
+        option.display = entry[displayAttribute.name]
+      }
+      display.push(option)
+    }
+    databases[name] = display
+
+    return databases
   }
 }
 
@@ -66,21 +130,57 @@ function readItem (req, res, next) {
     .catch(next)
 }
 
-function updateItem (req, res, next) {
+async function updateItem (req, res, next) {
   if (req.method === 'GET') {
     // read item to update from database
-    const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.get(endpoint + '/' + req.params.id)
-      .then((reply) => { // object json
-        res.render('edit', {
-          title: 'Edit',
-          resources: req.app.get('resources'),
-          attributeTypes: req.app.get('resourceAttributeTypes'),
-          category: req.baseUrl,
-          details: reply.data
-        })
+    // const endpoint = req.app.get('endpoint') + req.baseUrl // old
+    const endpoint = req.app.get('endpoint')
+    const resources = req.app.get('resources')
+    const categoryUrl = req.baseUrl
+    const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+    // const one = getDatabases(category, resources, endpoint)
+    // const two = axios.get(endpoint + categoryUrl + '/' + req.params.id).then(reply => reply.data)
+    try {
+      // const results = await async.parallel({
+      //   databases: one,
+      //   details: two
+      // })
+
+      // const results = await Promise.all([one, two])
+      // res.render('edit', {
+      //   title: 'Edit',
+      //   resources: req.app.get('resources'),
+      //   attributeTypes: req.app.get('resourceAttributeTypes'),
+      //   category: req.baseUrl,
+      //   details: results[1],
+      //   databases: results[0]
+      // })
+
+      res.render('edit', {
+        title: 'Edit',
+        resources: req.app.get('resources'),
+        attributeTypes: req.app.get('resourceAttributeTypes'),
+        category: req.baseUrl,
+        details: await axios.get(endpoint + categoryUrl + '/' + req.params.id).then(reply => reply.data),
+        databases: await getDatabases(category, resources, endpoint)
       })
-      .catch(next)
+    } catch (err) {
+      return next(err)
+    }
+    // const databases = await getDatabases(category, resources, endpoint)
+
+    // axios.get(endpoint + categoryUrl + '/' + req.params.id)
+    //   .then((reply) => { // object json
+    //     res.render('edit', {
+    //       title: 'Edit',
+    //       resources: req.app.get('resources'),
+    //       attributeTypes: req.app.get('resourceAttributeTypes'),
+    //       category: req.baseUrl,
+    //       details: reply.data,
+    //       databases
+    //     })
+    //   })
+    //   .catch(next)
   } else if (req.method === 'POST') {
     // update item in database
     const endpoint = req.app.get('endpoint') + req.baseUrl
@@ -182,10 +282,13 @@ function sanitizeAttributeTypes (req, res, next) {
   for (const attribute of attributes) {
     let value = typedBody[attribute.name]
 
-    if (value === undefined && attribute.type !== 'boolean') {
+    if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
       return next(createError(406))
     }
-    if (attribute.type === 'boolean') {
+    if (attribute.type === 'database') {
+      // ASSUME: value is either undefined or valid ID
+      // TODO: check ID?
+    } else if (attribute.type === 'boolean') {
       value = value !== undefined && value !== false
     } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
       return next(createError(406))
