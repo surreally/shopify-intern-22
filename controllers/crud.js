@@ -27,7 +27,6 @@ module.exports = exports
 
 async function createItem (req, res, next) {
   if (req.method === 'GET') {
-    // TODO: enable warehouse assignment
     const endpoint = req.app.get('endpoint')
     const resources = req.app.get('resources')
     const categoryUrl = req.baseUrl
@@ -35,19 +34,13 @@ async function createItem (req, res, next) {
 
     try {
       const databases = await getDatabases(category, resources, endpoint)
-      // - consider making it optional: item can be created w/o warehouse at first?
-      // // debug
-      // console.log(databases)
-      // console.log(databases.warehouse[0])
-      // return next(createError(503))
-
       // create item in database
       res.render('edit', {
         title: 'New',
         resources,
         attributeTypes: req.app.get('resourceAttributeTypes'),
         category,
-        databases // if any attribute is itself database
+        databases // if any attribute is itself a database
       })
     } catch (err) {
       return next(err)
@@ -80,30 +73,20 @@ async function getDatabases (category, resources, endpoint) {
     const inventory = reply.data
 
     // determine the one display attribute besides id: at most two levels of detail
-    const dbResource = resources.find(resource => resource.category === name)
-    // const displayAttributes = ['_id'] // ASSUME: (crudcrud) database generates ID's as '_id'
     /* tentative strategy for finding display attribute: type is string
         * - matches 'name', 'location', etc. attributes
         * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
         *   - short, identifiable attributes should be defined early in configuration
         */
+    const dbResource = resources.find(resource => resource.category === name)
     const displayAttribute = dbResource.attributes.find(attr => attr.type === 'string')
-    // if (displayAttribute !== undefined) { // ASSUME: found suitable
-    //   displayAttributes.push(displayAttribute.name)
-    // } // else: no string type attribute was defined for this other resource, use ID
 
     // get options to display
     const display = []
     for (const entry of inventory) {
       const option = {}
-      // displayAttributes.forEach(function getOptionDetail (attr) {
-      //   option[attr] = entry[attr]
-      // })
       option.id = entry._id
       if (displayAttribute !== undefined) {
-        // const identifier = {}
-        // identifier[displayAttribute.name] = entry[displayAttribute.name]
-        // option.display = identifier
         option.display = entry[displayAttribute.name]
       }
       display.push(option)
@@ -124,7 +107,9 @@ function readItem (req, res, next) {
         resources: req.app.get('resources'),
         category: req.baseUrl,
         id: req.path,
-        details: reply.data
+        // TODO: this is bad, but I'm assuming here all data from database came from
+        //       this server, which was escaped
+        details: unescapeInputs(reply.data)
       })
     })
     .catch(next)
@@ -133,54 +118,25 @@ function readItem (req, res, next) {
 async function updateItem (req, res, next) {
   if (req.method === 'GET') {
     // read item to update from database
-    // const endpoint = req.app.get('endpoint') + req.baseUrl // old
     const endpoint = req.app.get('endpoint')
     const resources = req.app.get('resources')
     const categoryUrl = req.baseUrl
     const category = categoryUrl.slice(categoryUrl.search(/\w/g))
-    // const one = getDatabases(category, resources, endpoint)
-    // const two = axios.get(endpoint + categoryUrl + '/' + req.params.id).then(reply => reply.data)
+
     try {
-      // const results = await async.parallel({
-      //   databases: one,
-      //   details: two
-      // })
-
-      // const results = await Promise.all([one, two])
-      // res.render('edit', {
-      //   title: 'Edit',
-      //   resources: req.app.get('resources'),
-      //   attributeTypes: req.app.get('resourceAttributeTypes'),
-      //   category: req.baseUrl,
-      //   details: results[1],
-      //   databases: results[0]
-      // })
-
       res.render('edit', {
         title: 'Edit',
         resources: req.app.get('resources'),
         attributeTypes: req.app.get('resourceAttributeTypes'),
         category: req.baseUrl,
-        details: await axios.get(endpoint + categoryUrl + '/' + req.params.id).then(reply => reply.data),
+        details: unescapeInputs(await axios
+          .get(endpoint + categoryUrl + '/' + req.params.id)
+          .then(reply => reply.data)),
         databases: await getDatabases(category, resources, endpoint)
       })
     } catch (err) {
       return next(err)
     }
-    // const databases = await getDatabases(category, resources, endpoint)
-
-    // axios.get(endpoint + categoryUrl + '/' + req.params.id)
-    //   .then((reply) => { // object json
-    //     res.render('edit', {
-    //       title: 'Edit',
-    //       resources: req.app.get('resources'),
-    //       attributeTypes: req.app.get('resourceAttributeTypes'),
-    //       category: req.baseUrl,
-    //       details: reply.data,
-    //       databases
-    //     })
-    //   })
-    //   .catch(next)
   } else if (req.method === 'POST') {
     // update item in database
     const endpoint = req.app.get('endpoint') + req.baseUrl
@@ -222,7 +178,7 @@ function listItems (req, res, next) {
         resources: req.app.get('resources'),
         detailLevel: req.app.get('resourceListDetailLevel'),
         category: req.originalUrl,
-        inventory: reply.data
+        inventory: reply.data.map(entry => unescapeInputs(entry))
       })
     })
     .catch(next)
@@ -251,7 +207,7 @@ function escapeInputs (req, res, next) {
   // request payload was urlencoded -> req.body has null prototype
   // (I guess express.json() and express.urlencoded() have diff implementations)
   const unescaped = Object.entries(req.body)
-  const escaped = Object.create(null)
+  const escaped = {}
   // TODO: figure out hwo to move these out
   unescaped.forEach(function escapeProperty (property) {
     const [key, value] = property.map(function escapeField (field) {
@@ -265,6 +221,24 @@ function escapeInputs (req, res, next) {
   })
   req.body = escaped
   return next()
+}
+
+// unescape all names and values in an un-nested object for display
+function unescapeInputs (body) {
+  const escaped = Object.entries(body)
+  const unescaped = {}
+  // TODO: figure out hwo to move these out
+  escaped.forEach(function unescapeProperty (property) {
+    const [key, value] = property.map(function unescapeField (field) {
+      // for now, coerce every key and value into a string
+      field = validator.trim(field + '')
+      if (!validator.isLength(field, { min: 1 })) throw createError(406)
+      field = validator.unescape(field)
+      return field
+    })
+    unescaped[key] = value
+  })
+  return unescaped
 }
 
 // enforce resource attribute types for POST and PUT inputs
