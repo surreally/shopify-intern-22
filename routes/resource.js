@@ -2,6 +2,9 @@ const express = require('express')
 const router = express.Router()
 const api = require('../controllers/crud')
 
+// ignore query strings
+router.use(api.stripQuery)
+
 // create item
 router.get('/new', api.create)
 router.post('/new',
@@ -10,22 +13,32 @@ router.post('/new',
   api.create)
 
 // read item
-router.get('/:id', api.read)
+router.get('/:id',
+  api.checkID,
+  api.read)
 
 // update item
-router.get('/:id/edit', api.update)
+router.get('/:id/edit',
+  api.checkID,
+  api.update)
 router.post('/:id/edit',
+  api.checkID,
   api.escape,
   api.sanitize,
   api.update)
 router.put('/:id',
+  api.checkID,
   api.escape,
   api.sanitize,
   api.update)
 
 // delete item
-router.post('/:id/delete', api.delete) // ignore request body
-router.delete('/:id', api.delete)
+router.post('/:id/delete',
+  api.checkID,
+  api.delete) // ignore request body
+router.delete('/:id',
+  api.checkID,
+  api.delete)
 
 // list all items
 router.get('/', api.list)

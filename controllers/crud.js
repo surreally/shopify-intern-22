@@ -20,6 +20,10 @@ exports.escape = escapeInputs
 
 exports.sanitize = sanitizeAttributeTypes
 
+exports.checkID = checkID
+
+exports.stripQuery = stripQueryString
+
 module.exports = exports
 
 /* implementations */
@@ -29,16 +33,18 @@ async function createItem (req, res, next) {
   const categoryUrl = req.baseUrl
 
   if (req.method === 'POST') {
-    // create item in database
-    const id = await axios.post(endpoint + categoryUrl,
-      req.body)
-      .then(res => res.data._id)
-      .catch(next)
+    try { // create item in database
+      const id = await axios.post(endpoint + categoryUrl,
+        req.body)
+        .then(res => res.data._id)
 
-    return res.redirect(categoryUrl + '/' + id)
+      return res.redirect(categoryUrl + '/' + id)
+    } catch (err) {
+      return next(err)
+    }
   } else if (req.method !== 'GET') {
     return next(createError(400))
-  }
+  } // req.method === 'GET'
 
   const resources = req.app.get('resources')
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
@@ -46,7 +52,7 @@ async function createItem (req, res, next) {
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
 
-  try {
+  try { // populate database attributes
     const databases = await getDatabases(attributes, resources, endpoint)
 
     return res.render('edit', {
@@ -67,20 +73,22 @@ async function readItem (req, res, next) {
   const categoryUrl = req.baseUrl
   const idUrl = '/' + req.params.id
 
-  // read item from database
-  const details = await axios.get(endpoint + categoryUrl + idUrl)
-    .then(res => unescapeInputs(res.data)) // queryType parsing optional
-    .catch(next)
-  // TODO: this is bad, but I'm assuming here all data from database came from
-  //       this server, which was escaped, so unescaping it all is ok
+  try { // read item from database
+    const details = await axios.get(endpoint + categoryUrl + idUrl)
+      .then(res => unescapeInputs(res.data))
+    // TODO: this is bad, but I'm assuming here all data from database came from
+    //       this server, which was escaped, so unescaping it all is ok
 
-  return res.render('detail', {
-    title: 'Detail',
-    resources,
-    categoryUrl,
-    idUrl,
-    details
-  })
+    return res.render('detail', {
+      title: 'Detail',
+      resources,
+      categoryUrl,
+      idUrl,
+      details
+    })
+  } catch (err) {
+    return next(err)
+  }
 }
 
 async function updateItem (req, res, next) {
@@ -89,27 +97,30 @@ async function updateItem (req, res, next) {
   const idUrl = '/' + req.params.id
 
   if (req.method === 'POST' || req.method === 'PUT') {
-    // update item in database
-    return axios.put(endpoint + categoryUrl + idUrl,
-      req.body)
-      .then(res.redirect(categoryUrl + idUrl))
-      .catch(next)
+    try { // update item in database
+      return axios.put(endpoint + categoryUrl + idUrl,
+        req.body)
+        .then(res.redirect(categoryUrl + idUrl))
+    } catch (err) {
+      return next(err)
+    }
   } else if (req.method !== 'GET') {
     return next(createError(400))
-  }
+  } // req.method === 'GET'
 
   const resources = req.app.get('resources')
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const attributeTypes = req.app.get('resourceAttributeTypes')
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
+  const detailsReq = axios.get(endpoint + categoryUrl + idUrl)
+    .then(res => res.data)
+  const databasesReq = getDatabases(attributes, resources, endpoint)
 
-  try {
-    // read item to update from database
-    const details = await axios.get(endpoint + categoryUrl + idUrl)
-      .then(res => queryType.parseObject(unescapeInputs(res.data)))
-      .catch(next)
-    const databases = await getDatabases(attributes, resources, endpoint)
+  try { // read item to update from database and populate database attributes
+    const results = await Promise.all([detailsReq, databasesReq])
+    const details = queryType.parseObject(unescapeInputs(results[0]))
+    const databases = results[1]
 
     return res.render('edit', {
       title: 'Edit',
@@ -129,10 +140,12 @@ async function deleteItem (req, res, next) {
   const categoryUrl = req.baseUrl
   const idUrl = '/' + req.params.id
 
-  // delete item in database
-  return axios.delete(endpoint + categoryUrl + idUrl)
-    .then(res.redirect(categoryUrl))
-    .catch(next)
+  try { // delete item in database
+    return axios.delete(endpoint + categoryUrl + idUrl)
+      .then(res.redirect(categoryUrl))
+  } catch (err) {
+    return next(err)
+  }
 }
 
 async function listItems (req, res, next) {
@@ -142,18 +155,21 @@ async function listItems (req, res, next) {
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const detailLevel = req.app.get('resourceListDetailLevel')
 
-  // read items from database
-  const inventory = await axios.get(endpoint + categoryUrl)
-    .then(res => res.data.map(details => unescapeInputs(details))) // queryType parsing optional
-    .catch(next)
+  try { // read items from database
+    const inventory = await axios.get(endpoint + categoryUrl)
+      .then(res => res.data.map(details =>
+        unescapeInputs(details))) // queryType parsing optional
 
-  return res.render('list', {
-    title: 'List',
-    resources,
-    detailLevel,
-    category,
-    inventory
-  })
+    return res.render('list', {
+      title: 'List',
+      resources,
+      detailLevel,
+      category,
+      inventory
+    })
+  } catch (err) {
+    return next(err)
+  }
 }
 
 function handleError (error, req, res, next) {
@@ -228,6 +244,17 @@ function sanitizeAttributeTypes (req, res, next) {
   return next()
 }
 
+// naive for now
+function checkID (req, res, next) {
+  if (!validator.isAlphanumeric(req.params.id)) return next(createError(406))
+  return next()
+}
+
+function stripQueryString (req, res, next) {
+  req.query = {}
+  return next()
+}
+
 /* utilities */
 
 // for a given resource, return ('populate') its database attributes
@@ -242,6 +269,7 @@ async function getDatabases (attributes, resources, endpoint) {
 
   // I/O: send a 'list' (read all) request to database
   const inventories = await Promise.all(dbRequests)
+  // error uncaught: sent back to caller (updateItem)
 
   const dbResources = dbCategories.map(category =>
     resources.find(resource =>
@@ -275,7 +303,7 @@ async function getDatabases (attributes, resources, endpoint) {
               ? '_id'
               : 'display',
             detail[1]
-          ])) // relabel the display attribute name for view to render
+          ])) // relabel the display attribute name as 'display' for view to render
       .map(details =>
         Object.fromEntries(details))
       .map(details =>
