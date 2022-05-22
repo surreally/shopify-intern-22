@@ -35,7 +35,7 @@ async function createItem (req, res, next) {
       .then(res => res.data._id)
       .catch(next)
 
-    res.redirect(categoryUrl + '/' + id)
+    return res.redirect(categoryUrl + '/' + id)
   } else if (req.method !== 'GET') {
     return next(createError(400))
   }
@@ -49,7 +49,7 @@ async function createItem (req, res, next) {
   try {
     const databases = await getDatabases(attributes, resources, endpoint)
 
-    res.render('edit', {
+    return res.render('edit', {
       title: 'New',
       resources,
       attributeTypes,
@@ -69,12 +69,12 @@ async function readItem (req, res, next) {
 
   // read item from database
   const details = await axios.get(endpoint + categoryUrl + idUrl)
-    .then(res => unescapeInputs(res.data))
+    .then(res => unescapeInputs(res.data)) // queryType parsing optional
     .catch(next)
   // TODO: this is bad, but I'm assuming here all data from database came from
   //       this server, which was escaped, so unescaping it all is ok
 
-  res.render('detail', {
+  return res.render('detail', {
     title: 'Detail',
     resources,
     categoryUrl,
@@ -90,7 +90,7 @@ async function updateItem (req, res, next) {
 
   if (req.method === 'POST' || req.method === 'PUT') {
     // update item in database
-    axios.put(endpoint + categoryUrl + idUrl,
+    return axios.put(endpoint + categoryUrl + idUrl,
       req.body)
       .then(res.redirect(categoryUrl + idUrl))
       .catch(next)
@@ -107,14 +107,11 @@ async function updateItem (req, res, next) {
   try {
     // read item to update from database
     const details = await axios.get(endpoint + categoryUrl + idUrl)
-      .then(res => unescapeInputs(res.data))
+      .then(res => queryType.parseObject(unescapeInputs(res.data)))
       .catch(next)
     const databases = await getDatabases(attributes, resources, endpoint)
-    // // debug
-    // console.log(databases)
-    // return next(createError(501))
 
-    res.render('edit', {
+    return res.render('edit', {
       title: 'Edit',
       resources,
       attributeTypes,
@@ -133,7 +130,7 @@ async function deleteItem (req, res, next) {
   const idUrl = '/' + req.params.id
 
   // delete item in database
-  await axios.delete(endpoint + categoryUrl + idUrl)
+  return axios.delete(endpoint + categoryUrl + idUrl)
     .then(res.redirect(categoryUrl))
     .catch(next)
 }
@@ -147,10 +144,10 @@ async function listItems (req, res, next) {
 
   // read items from database
   const inventory = await axios.get(endpoint + categoryUrl)
-    .then(res => res.data.map(details => unescapeInputs(details)))
+    .then(res => res.data.map(details => unescapeInputs(details))) // queryType parsing optional
     .catch(next)
 
-  res.render('list', {
+  return res.render('list', {
     title: 'List',
     resources,
     detailLevel,
