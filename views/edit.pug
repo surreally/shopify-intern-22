@@ -7,7 +7,7 @@ block content
   - const resource = resources.find(resource => resource.category === category)
   - const attributes = resource.attributes
   - const attrTypeMap = attributeTypes
-  h1= title + ' ' + name
+  h1= title + ' ' + category
 
   form.mb-3(method='POST', action='')
     button.btn.btn-primary.mb-3(type='submit') Submit

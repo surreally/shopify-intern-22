@@ -2,6 +2,7 @@ const axios = require('axios')
 const createError = require('http-errors')
 const queryType = require('query-types')
 const validator = require('validator')
+const _ = require('underscore')
 
 exports.create = createItem
 
@@ -21,128 +22,123 @@ exports.sanitize = sanitizeAttributeTypes
 
 module.exports = exports
 
-// note: req.baseUrl is of the form '/item'
+/* implementations */
 
 async function createItem (req, res, next) {
-  if (req.method === 'GET') {
-    const endpoint = req.app.get('endpoint')
-    const resources = req.app.get('resources')
-    const categoryUrl = req.baseUrl
-    const category = categoryUrl.slice(categoryUrl.search(/\w/g))
-    const attributeTypes = req.app.get('resourceAttributeTypes')
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
 
-    try {
-      const databases = await getDatabases(category, resources, endpoint)
-      // create item in database
-      res.render('edit', {
-        title: 'New',
-        resources,
-        attributeTypes,
-        category,
-        databases // if any attribute is itself a database
-      })
-    } catch (err) {
-      return next(err)
-    }
-  } else if (req.method === 'POST') {
+  if (req.method === 'POST') {
     // create item in database
-    const endpoint = req.app.get('endpoint')
-    const categoryUrl = req.baseUrl
-    axios.post(endpoint + categoryUrl,
+    const id = await axios.post(endpoint + categoryUrl,
       req.body)
-      .then((reply) => { // object json
-        res.redirect(categoryUrl + '/' + reply.data._id)
-      })
+      .then(res => res.data._id)
       .catch(next)
-  } else {
+
+    res.redirect(categoryUrl + '/' + id)
+  } else if (req.method !== 'GET') {
     return next(createError(400))
+  }
+
+  const resources = req.app.get('resources')
+  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+  const attributeTypes = req.app.get('resourceAttributeTypes')
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+
+  try {
+    const databases = await getDatabases(attributes, resources, endpoint)
+
+    res.render('edit', {
+      title: 'New',
+      resources,
+      attributeTypes,
+      category,
+      databases // if any
+    })
+  } catch (err) {
+    return next(err)
   }
 }
 
-function readItem (req, res, next) {
-  // read item from database
+async function readItem (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const resources = req.app.get('resources')
   const categoryUrl = req.baseUrl
-  const idUrl = req.path
+  const idUrl = '/' + req.params.id
 
-  axios.get(endpoint + categoryUrl + '/' + req.params.id)
-    .then((reply) => { // object json
-      res.render('detail', {
-        title: 'Detail',
-        resources,
-        categoryUrl,
-        idUrl,
-        // TODO: this is bad, but I'm assuming here all data from database came from
-        //       this server, which was escaped
-        details: unescapeInputs(reply.data)
-      })
-    })
+  // read item from database
+  const details = await axios.get(endpoint + categoryUrl + idUrl)
+    .then(res => unescapeInputs(res.data))
     .catch(next)
+  // TODO: this is bad, but I'm assuming here all data from database came from
+  //       this server, which was escaped, so unescaping it all is ok
+
+  res.render('detail', {
+    title: 'Detail',
+    resources,
+    categoryUrl,
+    idUrl,
+    details
+  })
 }
 
 async function updateItem (req, res, next) {
-  if (req.method === 'GET') {
-    // read item to update from database
-    const endpoint = req.app.get('endpoint')
-    const resources = req.app.get('resources')
-    const categoryUrl = req.baseUrl
-    const category = categoryUrl.slice(categoryUrl.search(/\w/g))
-    const attributeTypes = req.app.get('resourceAttributeTypes')
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
+  const idUrl = '/' + req.params.id
 
-    try {
-      res.render('edit', {
-        title: 'Edit',
-        resources,
-        attributeTypes,
-        category,
-        details: unescapeInputs(await axios.get(endpoint + categoryUrl + '/' + req.params.id)
-          .then(reply => reply.data)),
-        databases: await getDatabases(category, resources, endpoint)
-      })
-    } catch (err) {
-      return next(err)
-    }
-  } else if (req.method === 'POST') {
+  if (req.method === 'POST' || req.method === 'PUT') {
     // update item in database
-    const endpoint = req.app.get('endpoint')
-    const categoryUrl = req.baseUrl
-
-    axios.put(endpoint + categoryUrl + '/' + req.params.id,
+    axios.put(endpoint + categoryUrl + idUrl,
       req.body)
-      .then((reply) => { // empty
-        res.redirect(categoryUrl + '/' + req.params.id)
-      })
+      .then(res.redirect(categoryUrl + idUrl))
       .catch(next)
-  } else if (req.method === 'PUT') {
-    // update item in database
-    const endpoint = req.app.get('endpoint')
-    const categoryUrl = req.baseUrl
-
-    axios.put(endpoint + categoryUrl + '/' + req.params.id,
-      req.body)
-      .then((reply) => { // empty
-        res.redirect(categoryUrl + '/' + req.params.id)
-      })
-      .catch(next)
-  } else {
+  } else if (req.method !== 'GET') {
     return next(createError(400))
+  }
+
+  const resources = req.app.get('resources')
+  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+  const attributeTypes = req.app.get('resourceAttributeTypes')
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+
+  try {
+    // read item to update from database
+    const details = await axios.get(endpoint + categoryUrl + idUrl)
+      .then(res => unescapeInputs(res.data))
+      .catch(next)
+    const databases = await getDatabases(attributes, resources, endpoint)
+    // debug
+    console.log(databases)
+    return next(createError(501))
+
+    res.render('edit', {
+      title: 'Edit',
+      resources,
+      attributeTypes,
+      category,
+      details,
+      databases
+    })
+  } catch (err) {
+    return next(err)
   }
 }
 
-function deleteItem (req, res, next) {
-  // delete item in database
+async function deleteItem (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const categoryUrl = req.baseUrl
+  const idUrl = '/' + req.params.id
 
-  axios.delete(endpoint + categoryUrl + '/' + req.params.id)
-    .then((reply) => { // empty
-      res.redirect(categoryUrl)
-    })
+  // delete item in database
+  await axios.delete(endpoint + categoryUrl + idUrl)
+    .then(res.redirect(categoryUrl))
     .catch(next)
 }
 
-function listItems (req, res, next) {
+async function listItems (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const resources = req.app.get('resources')
   const categoryUrl = req.baseUrl
@@ -150,23 +146,22 @@ function listItems (req, res, next) {
   const detailLevel = req.app.get('resourceListDetailLevel')
 
   // read items from database
-  axios.get(endpoint + categoryUrl)
-    .then((reply) => { // array of json objects
-      res.render('list', {
-        title: 'List',
-        resources,
-        detailLevel,
-        category,
-        inventory: reply.data.map(details => unescapeInputs(details))
-      })
-    })
+  const inventory = await axios.get(endpoint + categoryUrl)
+    .then(res => res.data.map(details => unescapeInputs(details)))
     .catch(next)
+
+  res.render('list', {
+    title: 'List',
+    resources,
+    detailLevel,
+    category,
+    inventory
+  })
 }
 
 function handleError (error, req, res, next) {
-  // if (createError.isHttpError(error)) return next(error)
-  // - somehow this fails: "createError.isHttpError is a property", not a function
   if (error instanceof createError.HttpError) return next(error)
+
   // https://axios-http.com/docs/handling_errors
   if (error.response) {
     const err = createError(error.response.status)
@@ -207,7 +202,8 @@ function sanitizeAttributeTypes (req, res, next) {
   // queryType parses '' as null, and ignores all null values (deletes property)
   const typedBody = queryType.parseObject(req.body)
   const resources = req.app.get('resources')
-  const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
+  const categoryUrl = req.baseUrl
+  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
   const orderedBody = {}
@@ -235,47 +231,107 @@ function sanitizeAttributeTypes (req, res, next) {
   return next()
 }
 
-// utilities
+/* utilities */
 
-// TODO: refactor
-async function getDatabases (category, resources, endpoint) {
-  const resource = resources.find(resource => resource.category === category)
-  const attributes = resource.attributes
+// for a given resource, return ('populate') its database attributes
+async function getDatabases (attributes, resources, endpoint) {
   const databases = {}
 
+  const dbAttributes = attributes.filter(attr => attr.type === 'database')
+  const dbCategories = dbAttributes.map(attr => attr.name)
+  const dbRequests = dbCategories.map(category => axios.get(endpoint + '/' + category)
+    .then(res => res.data))
+  const inventories = await Promise.all(dbRequests)
+  const dbResources = dbCategories.map(category => resources.find(resource => resource.category === category))
+  const dbDisplayAttributes = dbResources.map(resource => resource.attributes.find(attr => attr.type === 'string'))
+  const dbDisplayAttrNames = dbDisplayAttributes.map(attr => attr.name)
+  /* display attr names are like location, identifier, name
+   * inventories are like warehouse list, shipment list
+   */
+  // // consider underscore library
+  // const zippedInventories = _.zip(inventories, dbDisplayAttrNames)
+  // const displayLists = zippedInventories.map(([inventory, attrName]) =>
+  //   inventory.map(details =>
+  //     Object.fromEntries(
+  //       [
+  //         ['_id', details._id],
+  //         ['display', details[attrName]]
+  //       ]
+  //     )
+  //   )
+  // )
+  // const zippedDisplayLists = _.zip(dbCategories, displayLists)
+  // const display = Object.fromEntries(zippedDisplayLists)
+  // return display
+  const labelsArray = dbDisplayAttrNames.map(name => ['_id', name])
+  const labeledInventories = _.zip(inventories, labelsArray)
+  // return labeledInventories
+  // const filteredInventories = labeledInventories.map(([inventory, labels]) =>
+  //   inventory.map(details =>
+  //     Object.fromEntries(Object.entries(details).filter(detail =>
+  //       labels.includes(detail[0])))).map(details =>
+  //     unescapeInputs(details)))
+  const displays = labeledInventories.map(([inventory, labels]) => inventory
+    .map(details =>
+      Object.entries(details))
+    .map(details =>
+      details.filter(detail =>
+        labels.includes(detail[0])))
+    .map(details =>
+      Object.fromEntries(details))
+    .map(details =>
+      unescapeInputs(details)))
+  const labeledDisplays = _.zip(dbCategories, displays)
+  const display = Object.fromEntries(labeledDisplays)
+  return display
+
+  // old implementation
   for (const { name, type } of attributes) {
     if (type !== 'database') continue
-    // attribute's type is database
 
     // get database
-    const databaseEndpoint = endpoint + '/' + name
-    const reply = await axios.get(databaseEndpoint) // list inventory of database, e.g. warehouse
-    const inventory = reply.data
+    const inventory = await axios.get(endpoint + '/' + name)
+      .then(res => res.data)
+      // error will be thrown back into caller: request handlers
 
-    // determine the one display attribute besides id: at most two levels of detail
+    // determine the one display attribute
     /* tentative strategy for finding display attribute: first one whose type is string
-        * - matches 'name', 'location', etc. attributes
-        * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
-        *   - short, identifiable attributes should be defined early in configuration
-        */
+     * - matches 'name', 'location', etc. attributes
+     * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
+     *   - short, identifiable attributes should be defined early in configuration
+     */
     const dbResource = resources.find(resource => resource.category === name)
-    const displayAttribute = dbResource.attributes.find(attr => attr.type === 'string')
+    const dbAttribute = dbResource.attributes.find(attr => attr.type === 'string')
 
     // get options to display
     const display = []
     for (const details of inventory) {
       const option = {}
       option._id = details._id
-      if (displayAttribute !== undefined) {
-        option.display = details[displayAttribute.name]
+      if (dbAttribute !== undefined) {
+        option.display = details[dbAttribute.name]
       }
-      display.push(unescapeInputs(option))
+
+      const unescapedOption = unescapeInputs(option)
+      display.push(unescapedOption)
     }
 
     databases[name] = display
   }
+
   return databases
 }
+
+// function unescapedOption (details) {
+//   const option = {}
+//   option._id = details._id
+//   if (dbAttribute !== undefined) {
+//     option.display = details[dbAttribute.name]
+//   }
+
+//   const unescapedOption = unescapeInputs(option)
+//   return unescapedOption
+// }
 
 // unescape all names and values in an un-nested object for display
 function unescapeInputs (body) {
