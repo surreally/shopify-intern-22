@@ -21,7 +21,9 @@ block content
     - const value = details[attribute.name]
     div.mb-3
       span #[strong #{attribute.name}]
-      if attribute.type === 'database'
+      if attribute.type === 'database' && value === undefined
+        p ---
+      else if attribute.type === 'database'
         p
           a(href='/'+attribute.name+'/'+value) #{value}
       else

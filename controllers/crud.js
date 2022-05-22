@@ -214,7 +214,7 @@ function sanitizeAttributeTypes (req, res, next) {
     if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
       return next(createError(406))
     } else if (attribute.type === 'database') {
-      // ASSUME: value is either undefined or valid ID
+      // ASSUME: value is either undefined or valid ID, or (horrible) escaped string
       // TODO: check ID?
     } else if (attribute.type === 'boolean') {
       value = value !== undefined && value !== false
