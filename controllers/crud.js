@@ -109,7 +109,7 @@ function readItem (req, res, next) {
         id: req.path,
         // TODO: this is bad, but I'm assuming here all data from database came from
         //       this server, which was escaped
-        entry: unescapeInputs(reply.data)
+        details: unescapeInputs(reply.data)
       })
     })
     .catch(next)

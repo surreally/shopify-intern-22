@@ -3,16 +3,17 @@
 extends layout
 
 block content
-  //- title, resources, attributeTypes, category[, details][, databases]
+  //- title, resources, attributeTypes, category[, databases[, details]]
   - const name = category.slice(category.search(/\w/g))
+  - const resource = resources.find(resource => resource.category === name)
+  - const attributes = resource.attributes
+  - const attrTypeMap = attributeTypes
   h1= title + ' ' + name
 
   form.mb-3(method='POST', action='')
     button.btn.btn-primary.mb-3(type='submit') Submit
 
-    - const resource = resources.find(resource => resource.category === name)
-    - const attributes = resource.attributes
-    - const attrTypeMap = attributeTypes
+    //- "attribute first"
     each attr in attributes
       - const value = details === undefined ? undefined : details[attr.name]
       div.mb-3
@@ -23,7 +24,7 @@ block content
             error.status = 503
             throw(error)
         else if attr.type === 'database' && databases[attr.name].length === 0
-          p No #{attr.name} available
+          p No available #{attr.name}
         else if attr.type === 'database'
           - const options = databases[attr.name] // array of options for display
           select(id=attr.name,

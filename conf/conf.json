@@ -13,12 +13,12 @@
           "type": "string"
         },
         {
-          "name": "quantity",
-          "type": "number"
-        },
-        {
           "name": "warehouse",
           "type": "database"
+        },
+        {
+          "name": "quantity",
+          "type": "number"
         }
       ]
     },
