@@ -21,8 +21,6 @@ exports.sanitize = sanitizeAttributeTypes
 
 module.exports = exports
 
-// utilities
-
 // note: req.baseUrl is of the form '/item'
 
 async function createItem (req, res, next) {
@@ -31,6 +29,7 @@ async function createItem (req, res, next) {
     const resources = req.app.get('resources')
     const categoryUrl = req.baseUrl
     const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+    const attributeTypes = req.app.get('resourceAttributeTypes')
 
     try {
       const databases = await getDatabases(category, resources, endpoint)
@@ -38,7 +37,7 @@ async function createItem (req, res, next) {
       res.render('edit', {
         title: 'New',
         resources,
-        attributeTypes: req.app.get('resourceAttributeTypes'),
+        attributeTypes,
         category,
         databases // if any attribute is itself a database
       })
@@ -47,10 +46,12 @@ async function createItem (req, res, next) {
     }
   } else if (req.method === 'POST') {
     // create item in database
-    const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.post(endpoint, req.body)
+    const endpoint = req.app.get('endpoint')
+    const categoryUrl = req.baseUrl
+    axios.post(endpoint + categoryUrl,
+      req.body)
       .then((reply) => { // object json
-        res.redirect(req.baseUrl + '/' + reply.data._id)
+        res.redirect(categoryUrl + '/' + reply.data._id)
       })
       .catch(next)
   } else {
@@ -58,55 +59,20 @@ async function createItem (req, res, next) {
   }
 }
 
-// TODO: refactor
-async function getDatabases (category, resources, endpoint) {
-  const resource = resources.find(resource => resource.category === category)
-  const attributes = resource.attributes
-  const databases = {}
-  for (const { name, type } of attributes) {
-    if (type !== 'database') continue
-    // attribute's type is database
-
-    // get database
-    const databaseEndpoint = endpoint + '/' + name
-    const reply = await axios.get(databaseEndpoint) // list inventory of database, e.g. warehouse
-    const inventory = reply.data
-
-    // determine the one display attribute besides id: at most two levels of detail
-    /* tentative strategy for finding display attribute: type is string
-        * - matches 'name', 'location', etc. attributes
-        * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
-        *   - short, identifiable attributes should be defined early in configuration
-        */
-    const dbResource = resources.find(resource => resource.category === name)
-    const displayAttribute = dbResource.attributes.find(attr => attr.type === 'string')
-
-    // get options to display
-    const display = []
-    for (const entry of inventory) {
-      const option = {}
-      option._id = entry._id
-      if (displayAttribute !== undefined) {
-        option.display = entry[displayAttribute.name]
-      }
-      display.push(unescapeInputs(option))
-    }
-    databases[name] = display
-
-    return databases
-  }
-}
-
 function readItem (req, res, next) {
   // read item from database
-  const endpoint = req.app.get('endpoint') + req.baseUrl
-  axios.get(endpoint + '/' + req.params.id)
+  const endpoint = req.app.get('endpoint')
+  const resources = req.app.get('resources')
+  const categoryUrl = req.baseUrl
+  const idUrl = req.path
+
+  axios.get(endpoint + categoryUrl + '/' + req.params.id)
     .then((reply) => { // object json
       res.render('detail', {
         title: 'Detail',
-        resources: req.app.get('resources'),
-        category: req.baseUrl,
-        id: req.path,
+        resources,
+        categoryUrl,
+        idUrl,
         // TODO: this is bad, but I'm assuming here all data from database came from
         //       this server, which was escaped
         details: unescapeInputs(reply.data)
@@ -122,15 +88,15 @@ async function updateItem (req, res, next) {
     const resources = req.app.get('resources')
     const categoryUrl = req.baseUrl
     const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+    const attributeTypes = req.app.get('resourceAttributeTypes')
 
     try {
       res.render('edit', {
         title: 'Edit',
-        resources: req.app.get('resources'),
-        attributeTypes: req.app.get('resourceAttributeTypes'),
-        category: req.baseUrl,
-        details: unescapeInputs(await axios
-          .get(endpoint + categoryUrl + '/' + req.params.id)
+        resources,
+        attributeTypes,
+        category,
+        details: unescapeInputs(await axios.get(endpoint + categoryUrl + '/' + req.params.id)
           .then(reply => reply.data)),
         databases: await getDatabases(category, resources, endpoint)
       })
@@ -139,18 +105,24 @@ async function updateItem (req, res, next) {
     }
   } else if (req.method === 'POST') {
     // update item in database
-    const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.put(endpoint + '/' + req.params.id, req.body)
+    const endpoint = req.app.get('endpoint')
+    const categoryUrl = req.baseUrl
+
+    axios.put(endpoint + categoryUrl + '/' + req.params.id,
+      req.body)
       .then((reply) => { // empty
-        res.redirect(req.baseUrl + '/' + req.params.id)
+        res.redirect(categoryUrl + '/' + req.params.id)
       })
       .catch(next)
   } else if (req.method === 'PUT') {
     // update item in database
-    const endpoint = req.app.get('endpoint') + req.baseUrl
-    axios.put(endpoint + '/' + req.params.id, req.body)
+    const endpoint = req.app.get('endpoint')
+    const categoryUrl = req.baseUrl
+
+    axios.put(endpoint + categoryUrl + '/' + req.params.id,
+      req.body)
       .then((reply) => { // empty
-        res.redirect(req.baseUrl + '/' + req.params.id)
+        res.redirect(categoryUrl + '/' + req.params.id)
       })
       .catch(next)
   } else {
@@ -160,25 +132,32 @@ async function updateItem (req, res, next) {
 
 function deleteItem (req, res, next) {
   // delete item in database
-  const endpoint = req.app.get('endpoint') + req.baseUrl
-  axios.delete(endpoint + '/' + req.params.id)
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
+
+  axios.delete(endpoint + categoryUrl + '/' + req.params.id)
     .then((reply) => { // empty
-      res.redirect(req.baseUrl)
+      res.redirect(categoryUrl)
     })
     .catch(next)
 }
 
 function listItems (req, res, next) {
+  const endpoint = req.app.get('endpoint')
+  const resources = req.app.get('resources')
+  const categoryUrl = req.baseUrl
+  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+  const detailLevel = req.app.get('resourceListDetailLevel')
+
   // read items from database
-  const endpoint = req.app.get('endpoint') + req.baseUrl
-  axios.get(endpoint)
+  axios.get(endpoint + categoryUrl)
     .then((reply) => { // array of json objects
       res.render('list', {
         title: 'List',
-        resources: req.app.get('resources'),
-        detailLevel: req.app.get('resourceListDetailLevel'),
-        category: req.originalUrl,
-        inventory: reply.data.map(entry => unescapeInputs(entry))
+        resources,
+        detailLevel,
+        category,
+        inventory: reply.data.map(details => unescapeInputs(details))
       })
     })
     .catch(next)
@@ -203,64 +182,42 @@ function handleError (error, req, res, next) {
 
 // escape all names and values from request body json
 function escapeInputs (req, res, next) {
-  // request payload was json -> req.body has Object prototype
-  // request payload was urlencoded -> req.body has null prototype
-  // (I guess express.json() and express.urlencoded() have diff implementations)
   const unescaped = Object.entries(req.body)
   const escaped = {}
-  // TODO: figure out hwo to move these out
+
+  // TODO: figure out hwo to move these functions out
   unescaped.forEach(function escapeProperty (property) {
     const [key, value] = property.map(function escapeField (field) {
       // for now, coerce every key and value into a string
       field = validator.trim(field + '')
-      // if (!validator.isLength(field, { min: 1 })) return next(createError(406))
+      // zero length is ok
       field = validator.escape(field)
       return field
     })
+
     escaped[key] = value
   })
+
   req.body = escaped
   return next()
 }
 
-// unescape all names and values in an un-nested object for display
-function unescapeInputs (body) {
-  const escaped = Object.entries(body)
-  const unescaped = {}
-  // TODO: figure out hwo to move these out
-  escaped.forEach(function unescapeProperty (property) {
-    const [key, value] = property.map(function unescapeField (field) {
-      // for now, coerce every key and value into a string
-      field = validator.trim(field + '')
-      // if (!validator.isLength(field, { min: 1 })) throw createError(406)
-      field = validator.unescape(field)
-      return field
-    })
-    unescaped[key] = value
-  })
-  return unescaped
-}
-
-// enforce resource attribute types for POST and PUT inputs
+// enforce resource attribute order and types for POST and PUT inputs
 function sanitizeAttributeTypes (req, res, next) {
-  if (req.method !== 'POST' && req.method !== 'PUT') return next()
-
   // queryType parses '' as null, and ignores all null values (deletes property)
   const typedBody = queryType.parseObject(req.body)
   const resources = req.app.get('resources')
   const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
-
-  // keep attribute order
   const orderedBody = {}
+
   for (const attribute of attributes) {
     let value = typedBody[attribute.name]
 
     if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
       return next(createError(406))
-    }
-    if (attribute.type === 'database') {
+    } else if (attribute.type === 'database') {
       // ASSUME: value is either undefined or valid ID
       // TODO: check ID?
     } else if (attribute.type === 'boolean') {
@@ -276,4 +233,66 @@ function sanitizeAttributeTypes (req, res, next) {
 
   req.body = orderedBody
   return next()
+}
+
+// utilities
+
+// TODO: refactor
+async function getDatabases (category, resources, endpoint) {
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+  const databases = {}
+
+  for (const { name, type } of attributes) {
+    if (type !== 'database') continue
+    // attribute's type is database
+
+    // get database
+    const databaseEndpoint = endpoint + '/' + name
+    const reply = await axios.get(databaseEndpoint) // list inventory of database, e.g. warehouse
+    const inventory = reply.data
+
+    // determine the one display attribute besides id: at most two levels of detail
+    /* tentative strategy for finding display attribute: first one whose type is string
+        * - matches 'name', 'location', etc. attributes
+        * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
+        *   - short, identifiable attributes should be defined early in configuration
+        */
+    const dbResource = resources.find(resource => resource.category === name)
+    const displayAttribute = dbResource.attributes.find(attr => attr.type === 'string')
+
+    // get options to display
+    const display = []
+    for (const details of inventory) {
+      const option = {}
+      option._id = details._id
+      if (displayAttribute !== undefined) {
+        option.display = details[displayAttribute.name]
+      }
+      display.push(unescapeInputs(option))
+    }
+
+    databases[name] = display
+  }
+  return databases
+}
+
+// unescape all names and values in an un-nested object for display
+function unescapeInputs (body) {
+  const escaped = Object.entries(body)
+  const unescaped = {}
+
+  escaped.forEach(function unescapeProperty (property) {
+    const [key, value] = property.map(function unescapeField (field) {
+      // for now, coerce every key and value into a string
+      field = validator.trim(field + '')
+      // zero length is ok
+      field = validator.unescape(field)
+      return field
+    })
+
+    unescaped[key] = value
+  })
+
+  return unescaped
 }

@@ -2,12 +2,11 @@ extends layout
 
 block content
   //- title, resources, detailLevel, category, inventory
-  - const name = category.slice(category.search(/\w/g))
-  - const resource = resources.find(resource => resource.category === name)
+  - const resource = resources.find(resource => resource.category === category)
   - const attributes = resource.attributes
   - const level = detailLevel <= 0 ? 1 : detailLevel
 
-  h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
+  h1= category.charAt(0).toUpperCase() + category.slice(1) + ' ' + title
 
   each details in inventory
     hr

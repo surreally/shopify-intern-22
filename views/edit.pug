@@ -4,8 +4,7 @@ extends layout
 
 block content
   //- title, resources, attributeTypes, category[, databases[, details]]
-  - const name = category.slice(category.search(/\w/g))
-  - const resource = resources.find(resource => resource.category === name)
+  - const resource = resources.find(resource => resource.category === category)
   - const attributes = resource.attributes
   - const attrTypeMap = attributeTypes
   h1= title + ' ' + name

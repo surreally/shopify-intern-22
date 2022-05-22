@@ -1,15 +1,15 @@
 extends layout
 
 block content
-  //- title, resources, category, id, details
-  - const name = category.slice(category.search(/\w/g))
-  - const resource = resources.find(resource => resource.category === name)
+  //- title, resources, categoryUrl, idUrl, details
+  - const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+  - const resource = resources.find(resource => resource.category === category)
   - const attributes = resource.attributes
-  h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
+  h1= category.charAt(0).toUpperCase() + category.slice(1) + ' ' + title
 
   div.mb-3
-    a.btn.btn-primary.me-3(href=category+id+'/edit') Edit
-  form.mb-3(method='POST', action=category+id+'/delete')
+    a.btn.btn-primary.me-3(href=categoryUrl+idUrl+'/edit') Edit
+  form.mb-3(method='POST', action=categoryUrl+idUrl+'/delete')
     button.btn.btn-primary.me-3(type='submit') Delete
 
   //- render ID
