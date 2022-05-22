@@ -2,18 +2,26 @@ extends layout
 
 block content
   //- title, resources, detailLevel, category, inventory
-  - const name = category.slice(category.search(/\w/g))
-  h1= name.charAt(0).toUpperCase() + name.slice(1) + ' ' + title
+  - const resource = resources.find(resource => resource.category === category)
+  - const attributes = resource.attributes
+  - const level = detailLevel <= 0 ? 1 : detailLevel
 
-  each entry in inventory
+  h1= category.charAt(0).toUpperCase() + category.slice(1) + ' ' + title
+
+  each details in inventory
     hr
-    - const details = Object.entries(entry)
-    - const level = detailLevel <= 0 ? 1 : detailLevel
-    each detail in details.slice(0, level)
+    //- render ID
+    div.mb-3
+      span #[strong ID]
+      p
+        a(href=category+'/'+details._id) #{details._id}
+    //- render attributes
+    each attribute in attributes.slice(0, level)
+      - const value = details[attribute.name]
       div.mb-3
-        span #[strong #{detail[0]}]
-        if detail[0] === '_id'
-          a.d-block(href=category+'/'+entry._id)
-            span #{detail[1]}
+        span #[strong #{attribute.name}]
+        if attribute.type === 'database'
+          p
+            a(href='/'+attribute.name+'/'+value) #{value}
         else
-          p #{detail[1]}
+          p #{value}

@@ -21,6 +21,8 @@ inventory.
 
 ## Deploy
 
+Deployed on Repl.it at https://replit.com/@toripi/shopify-intern-22
+
 ## Usage
 
 Use it in the browser or on the command line by sending http requests, e.g. with [httpie](https://httpie.io/)
@@ -34,7 +36,7 @@ As an example, if the desired resource is `item`:
 - Update
   - `GET /item/${id}/edit` renders page to update the item, prefilled with current details of the item
     - This page displays a form, therefore it sends a `POST /item/${id}/edit ...` request to update the item, which is handled by the server
-  - `PUT /item/${id}/edit` directly sends a request to update the item
+  - `PUT /item/${id}` directly sends a request to update the item
 - Delete
   - `POST /item/${id}/delete` sends a request to delete the item
     - This is reached from the item detail page in the browser
@@ -46,4 +48,9 @@ As an example, if the desired resource is `item`:
 ## 'Database'
 The app makes calls to the CRUD API at [crudcrud.com](https://crudcrud.com) to simulate database operations.
 
-The advantage is CrudCrud's data is very accessible. Verifying the correctness of the app becomes very easy. Downside is this app becomes somewhat redundant, but it's still a demonstration of a CRUD API. In a way, this app is a 'CRUD-CRUD'.
+The advantage is CrudCrud's data is very accessible. Verifying the correctness of the app becomes very easy.
+
+The downsides are:
+- Warehouse assignment can be done, but when database is set up so that item has information about its warehouse but not the other way around, pulling information becomes very tough. Ideally a warehouse's detail page will include a list of items assigned there. This is not implemented in this app.
+  - Regret: if the app was developed with MongoDB, for example, this would not be a problem as MongoDB (`mongoose`) can populate a field representing another database very easily.
+- This app becomes somewhat redundant since it's also just a naive CRUD.

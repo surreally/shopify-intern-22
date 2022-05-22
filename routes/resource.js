@@ -18,7 +18,7 @@ router.post('/:id/edit',
   api.escape,
   api.sanitize,
   api.update)
-router.put('/:id/edit',
+router.put('/:id',
   api.escape,
   api.sanitize,
   api.update)

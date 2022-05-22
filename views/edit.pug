@@ -3,34 +3,57 @@
 extends layout
 
 block content
-  //- title, resources, attributeTypes, category, details
-  - const name = category.slice(category.search(/\w/g))
-  h1= title + ' ' + name
+  //- title, resources, attributeTypes, category[, databases[, details]]
+  - const resource = resources.find(resource => resource.category === category)
+  - const attributes = resource.attributes
+  - const attrTypeMap = attributeTypes
+  h1= title + ' ' + category
 
   form.mb-3(method='POST', action='')
     button.btn.btn-primary.mb-3(type='submit') Submit
 
-    - const resource = resources.find(resource => resource.category === name)
-    - const attributes = resource.attributes
-    - const attrTypeMap = attributeTypes
-    each attribute in attributes
-      - const value = details === undefined ? undefined : details[attribute.name]
+    //- "attribute first"
+    each attr in attributes
+      - const value = details === undefined ? undefined : details[attr.name]
       div.mb-3
-        label.d-block(for=attribute.name) #[strong #{attribute.name}]
-        if attribute.type !== 'boolean'
-          input(id=attribute.name,
-                type=attrTypeMap[attribute.type],
-                name=attribute.name,
+        label.d-block(for=attr.name) #[strong #{attr.name}]
+        if attr.type === 'database' && (databases === undefined || databases[attr.name] === undefined)
+          -
+            const error = new Error(`Database ${attr.name} unavailable`)
+            error.status = 503
+            throw(error)
+        else if attr.type === 'database' && databases[attr.name].length === 0
+          p No available #{attr.name}
+        else if attr.type === 'database'
+          - const options = databases[attr.name] // array of options for display
+          select(id=attr.name,
+                 name=attr.name)
+            //- TODO: improve naive solution of 'no option selected in database'
+            if value === undefined
+              option(value='',
+                     selected) ---
+            else
+              option(value='') ---
+            for option in options
+              if option._id === value
+                option(value=option._id,
+                      selected) #{option.display}
+              else
+                option(value=option._id) #{option.display}
+        else if attr.type !== 'boolean'
+          input(id=attr.name,
+                type=attrTypeMap[attr.type],
+                name=attr.name,
                 value=(value === undefined? '' : value)
                 required)
         else if value === true
-          input(id=attribute.name,
-                type=attrTypeMap[attribute.type],
-                name=attribute.name,
+          input(id=attr.name,
+                type=attrTypeMap[attr.type],
+                name=attr.name,
                 checked)
                 //- boolean: checked, optional
         else
-          input(id=attribute.name,
-                type=attrTypeMap[attribute.type],
-                name=attribute.name)
+          input(id=attr.name,
+                type=attrTypeMap[attr.type],
+                name=attr.name)
                 //- boolean: unchecked, optional
