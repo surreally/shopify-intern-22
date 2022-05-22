@@ -9,8 +9,15 @@ block content
   form.mb-3(method='POST', action=category+id+'/delete')
     button.btn.btn-primary.me-3(type='submit') Delete
 
-  - const detailArray = Object.entries(details)
-  each detail in detailArray
+  - const details = Object.entries(entry)
+  - const resource = resources.find(resource => resource.category === name)
+  - const attributes = resource.attributes
+  each detail in details
+    - const attribute = detail[0] !== '_id' ? attributes.find(attr => attr.name === detail[0]) : undefined
     div.mb-3
       span #[strong #{detail[0]}]
-      p #{detail[1]}
+      if attribute !== undefined && attribute.type === 'database'
+        p
+          a(href='/'+detail[0]+'/'+detail[1]) #{detail[1]}
+      else
+        p #{detail[1]}

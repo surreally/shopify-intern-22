@@ -85,11 +85,11 @@ async function getDatabases (category, resources, endpoint) {
     const display = []
     for (const entry of inventory) {
       const option = {}
-      option.id = entry._id
+      option._id = entry._id
       if (displayAttribute !== undefined) {
         option.display = entry[displayAttribute.name]
       }
-      display.push(option)
+      display.push(unescapeInputs(option))
     }
     databases[name] = display
 
@@ -109,7 +109,7 @@ function readItem (req, res, next) {
         id: req.path,
         // TODO: this is bad, but I'm assuming here all data from database came from
         //       this server, which was escaped
-        details: unescapeInputs(reply.data)
+        entry: unescapeInputs(reply.data)
       })
     })
     .catch(next)
@@ -213,7 +213,7 @@ function escapeInputs (req, res, next) {
     const [key, value] = property.map(function escapeField (field) {
       // for now, coerce every key and value into a string
       field = validator.trim(field + '')
-      if (!validator.isLength(field, { min: 1 })) return next(createError(406))
+      // if (!validator.isLength(field, { min: 1 })) return next(createError(406))
       field = validator.escape(field)
       return field
     })
@@ -232,7 +232,7 @@ function unescapeInputs (body) {
     const [key, value] = property.map(function unescapeField (field) {
       // for now, coerce every key and value into a string
       field = validator.trim(field + '')
-      if (!validator.isLength(field, { min: 1 })) throw createError(406)
+      // if (!validator.isLength(field, { min: 1 })) throw createError(406)
       field = validator.unescape(field)
       return field
     })
@@ -245,7 +245,8 @@ function unescapeInputs (body) {
 function sanitizeAttributeTypes (req, res, next) {
   if (req.method !== 'POST' && req.method !== 'PUT') return next()
 
-  const typedBody = queryType.parseObject(req.body) // TODO: assess use of qT
+  // queryType parses '' as null, and ignores all null values (deletes property)
+  const typedBody = queryType.parseObject(req.body)
   const resources = req.app.get('resources')
   const category = req.baseUrl.slice(req.baseUrl.search(/\w/g))
   const resource = resources.find(resource => resource.category === category)

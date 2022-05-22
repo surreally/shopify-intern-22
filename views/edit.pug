@@ -22,17 +22,24 @@ block content
             const error = new Error(`Database ${attr.name} unavailable`)
             error.status = 503
             throw(error)
-          //- do nothing
         else if attr.type === 'database' && databases[attr.name].length === 0
           p No #{attr.name} available
         else if attr.type === 'database'
           - const options = databases[attr.name] // array of options for display
           select(id=attr.name,
                  name=attr.name)
-            //- TODO: a 'null' option, selected on create, or on null value in edit
-            //-       - this seems to require some sort of client-side JavaScript
+            //- TODO: improve naive solution of 'no option selected in database'
+            if value === undefined
+              option(value='',
+                     selected) ---
+            else
+              option(value='') ---
             for option in options
-              option(value=option.id) #{option.display}
+              if option._id === value
+                option(value=option._id,
+                      selected) #{option.display}
+              else
+                option(value=option._id) #{option.display}
         else if attr.type !== 'boolean'
           input(id=attr.name,
                 type=attrTypeMap[attr.type],
