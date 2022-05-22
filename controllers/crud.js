@@ -110,9 +110,9 @@ async function updateItem (req, res, next) {
       .then(res => unescapeInputs(res.data))
       .catch(next)
     const databases = await getDatabases(attributes, resources, endpoint)
-    // debug
-    console.log(databases)
-    return next(createError(501))
+    // // debug
+    // console.log(databases)
+    // return next(createError(501))
 
     res.render('edit', {
       title: 'Edit',
@@ -235,103 +235,59 @@ function sanitizeAttributeTypes (req, res, next) {
 
 // for a given resource, return ('populate') its database attributes
 async function getDatabases (attributes, resources, endpoint) {
-  const databases = {}
+  const dbAttributes = attributes.filter(attr =>
+    attr.type === 'database')
+  const dbCategories = dbAttributes.map(attr =>
+    attr.name)
+  const dbRequests = dbCategories.map(category =>
+    axios.get(endpoint + '/' + category)
+      .then(res => res.data))
 
-  const dbAttributes = attributes.filter(attr => attr.type === 'database')
-  const dbCategories = dbAttributes.map(attr => attr.name)
-  const dbRequests = dbCategories.map(category => axios.get(endpoint + '/' + category)
-    .then(res => res.data))
+  // I/O: send a 'list' (read all) request to database
   const inventories = await Promise.all(dbRequests)
-  const dbResources = dbCategories.map(category => resources.find(resource => resource.category === category))
-  const dbDisplayAttributes = dbResources.map(resource => resource.attributes.find(attr => attr.type === 'string'))
-  const dbDisplayAttrNames = dbDisplayAttributes.map(attr => attr.name)
-  /* display attr names are like location, identifier, name
-   * inventories are like warehouse list, shipment list
-   */
-  // // consider underscore library
-  // const zippedInventories = _.zip(inventories, dbDisplayAttrNames)
-  // const displayLists = zippedInventories.map(([inventory, attrName]) =>
-  //   inventory.map(details =>
-  //     Object.fromEntries(
-  //       [
-  //         ['_id', details._id],
-  //         ['display', details[attrName]]
-  //       ]
-  //     )
-  //   )
-  // )
-  // const zippedDisplayLists = _.zip(dbCategories, displayLists)
-  // const display = Object.fromEntries(zippedDisplayLists)
-  // return display
-  const labelsArray = dbDisplayAttrNames.map(name => ['_id', name])
+
+  const dbResources = dbCategories.map(category =>
+    resources.find(resource =>
+      resource.category === category))
+  const dbDisplayAttributes = dbResources.map(resource =>
+    resource.attributes.find(attr =>
+      attr.type === 'string'))
+  const dbDisplayAttrNames = dbDisplayAttributes.map(attr =>
+    attr.name)
+  // if number of display attributes changes, this method is extensible;
+  // but there's only one thing to display, I don't know why I did this
+  const labelsArray = dbDisplayAttrNames.map(name =>
+    ['_id', name])
   const labeledInventories = _.zip(inventories, labelsArray)
-  // return labeledInventories
-  // const filteredInventories = labeledInventories.map(([inventory, labels]) =>
-  //   inventory.map(details =>
-  //     Object.fromEntries(Object.entries(details).filter(detail =>
-  //       labels.includes(detail[0])))).map(details =>
-  //     unescapeInputs(details)))
-  const displays = labeledInventories.map(([inventory, labels]) => inventory
-    .map(details =>
-      Object.entries(details))
-    .map(details =>
-      details.filter(detail =>
-        labels.includes(detail[0])))
-    .map(details =>
-      Object.fromEntries(details))
-    .map(details =>
-      unescapeInputs(details)))
+  // the idea is to transform
+  //   'inventories': with all attributes for every resource (as database)
+  // into
+  //   'displays': with only the ID and the other display attribute value
+  // with the attribute names to select, one per inventory/kind of resource
+  const displays = labeledInventories.map(([inventory, labels]) =>
+    inventory
+      .map(details =>
+        Object.entries(details))
+      .map(details =>
+        details.filter(detail => // select the required attributes only
+          labels.includes(detail[0])))
+      .map(details =>
+        details.map(detail =>
+          [
+            detail[0] === '_id'
+              ? '_id'
+              : 'display',
+            detail[1]
+          ])) // relabel the display attribute name for view to render
+      .map(details =>
+        Object.fromEntries(details))
+      .map(details =>
+        unescapeInputs(details))) // escape both key and value
   const labeledDisplays = _.zip(dbCategories, displays)
+  // then to produce the final display by combining with labels
   const display = Object.fromEntries(labeledDisplays)
   return display
-
-  // old implementation
-  for (const { name, type } of attributes) {
-    if (type !== 'database') continue
-
-    // get database
-    const inventory = await axios.get(endpoint + '/' + name)
-      .then(res => res.data)
-      // error will be thrown back into caller: request handlers
-
-    // determine the one display attribute
-    /* tentative strategy for finding display attribute: first one whose type is string
-     * - matches 'name', 'location', etc. attributes
-     * - downside: will match 'description', 'summary', etc. too -- long -> unsuitable
-     *   - short, identifiable attributes should be defined early in configuration
-     */
-    const dbResource = resources.find(resource => resource.category === name)
-    const dbAttribute = dbResource.attributes.find(attr => attr.type === 'string')
-
-    // get options to display
-    const display = []
-    for (const details of inventory) {
-      const option = {}
-      option._id = details._id
-      if (dbAttribute !== undefined) {
-        option.display = details[dbAttribute.name]
-      }
-
-      const unescapedOption = unescapeInputs(option)
-      display.push(unescapedOption)
-    }
-
-    databases[name] = display
-  }
-
-  return databases
 }
-
-// function unescapedOption (details) {
-//   const option = {}
-//   option._id = details._id
-//   if (dbAttribute !== undefined) {
-//     option.display = details[dbAttribute.name]
-//   }
-
-//   const unescapedOption = unescapeInputs(option)
-//   return unescapedOption
-// }
 
 // unescape all names and values in an un-nested object for display
 function unescapeInputs (body) {
