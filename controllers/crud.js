@@ -4,11 +4,15 @@ const queryType = require('query-types')
 const validator = require('validator')
 const _ = require('underscore')
 
-exports.create = createItem
+exports.create = createItemPOST
+
+exports.createGET = createItemGET
 
 exports.read = readItem
 
-exports.update = updateItem
+exports.update = updateItemPOSTPUT
+
+exports.updateGET = updateItemGET
 
 exports.delete = deleteItem
 
@@ -28,24 +32,24 @@ module.exports = exports
 
 /* implementations */
 
-async function createItem (req, res, next) {
+async function createItemPOST (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const categoryUrl = req.baseUrl
 
-  if (req.method === 'POST') {
-    try { // create item in database
-      const id = await axios.post(endpoint + categoryUrl,
-        req.body)
-        .then(res => res.data._id)
+  try { // create item in database
+    const id = await axios.post(endpoint + categoryUrl,
+      req.body)
+      .then(res => res.data._id)
 
-      return res.redirect(categoryUrl + '/' + id)
-    } catch (err) {
-      return next(err)
-    }
-  } else if (req.method !== 'GET') {
-    return next(createError(400))
-  } // req.method === 'GET'
+    return res.redirect(categoryUrl + '/' + id)
+  } catch (err) {
+    return next(err)
+  }
+}
 
+async function createItemGET (req, res, next) {
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
   const resources = req.app.get('resources')
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const attributeTypes = req.app.get('resourceAttributeTypes')
@@ -75,9 +79,10 @@ async function readItem (req, res, next) {
 
   try { // read item from database
     const details = await axios.get(endpoint + categoryUrl + idUrl)
-      .then(res => unescapeInputs(res.data))
+      .then(res => unescapeInputs(res.data)) // queryType parsing optional
     // TODO: this is bad, but I'm assuming here all data from database came from
     //       this server, which was escaped, so unescaping it all is ok
+    //       same as listItems
 
     return res.render('detail', {
       title: 'Detail',
@@ -91,28 +96,30 @@ async function readItem (req, res, next) {
   }
 }
 
-async function updateItem (req, res, next) {
+async function updateItemPOSTPUT (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const categoryUrl = req.baseUrl
   const idUrl = '/' + req.params.id
 
-  if (req.method === 'POST' || req.method === 'PUT') {
-    try { // update item in database
-      return axios.put(endpoint + categoryUrl + idUrl,
-        req.body)
-        .then(res.redirect(categoryUrl + idUrl))
-    } catch (err) {
-      return next(err)
-    }
-  } else if (req.method !== 'GET') {
-    return next(createError(400))
-  } // req.method === 'GET'
+  try { // update item in database
+    await axios.put(endpoint + categoryUrl + idUrl,
+      req.body)
+    return res.redirect(categoryUrl + idUrl)
+  } catch (err) {
+    return next(err)
+  }
+}
 
+async function updateItemGET (req, res, next) {
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
+  const idUrl = '/' + req.params.id
   const resources = req.app.get('resources')
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const attributeTypes = req.app.get('resourceAttributeTypes')
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
+  // create two I/O promises
   const detailsReq = axios.get(endpoint + categoryUrl + idUrl)
     .then(res => res.data)
   const databasesReq = getDatabases(attributes, resources, endpoint)
@@ -141,8 +148,10 @@ async function deleteItem (req, res, next) {
   const idUrl = '/' + req.params.id
 
   try { // delete item in database
-    return axios.delete(endpoint + categoryUrl + idUrl)
-      .then(res.redirect(categoryUrl))
+    // return axios.delete(endpoint + categoryUrl + idUrl)
+    //   .then(res.redirect(categoryUrl)) // this is faster but possibly inaccurate
+    await axios.delete(endpoint + categoryUrl + idUrl)
+    return res.redirect(categoryUrl) // this is slower (depending on database) but accurate
   } catch (err) {
     return next(err)
   }
@@ -190,23 +199,10 @@ function handleError (error, req, res, next) {
 
 // escape all names and values from request body json
 function escapeInputs (req, res, next) {
-  const unescaped = Object.entries(req.body)
-  const escaped = {}
+  const unescapedEntries = Object.entries(req.body)
+  const escapedEntries = unescapedEntries.map(escapeProperty)
 
-  // TODO: figure out hwo to move these functions out
-  unescaped.forEach(function escapeProperty (property) {
-    const [key, value] = property.map(function escapeField (field) {
-      // for now, coerce every key and value into a string
-      field = validator.trim(field + '')
-      // zero length is ok
-      field = validator.escape(field)
-      return field
-    })
-
-    escaped[key] = value
-  })
-
-  req.body = escaped
+  req.body = Object.fromEntries(escapedEntries)
   return next()
 }
 
@@ -314,22 +310,38 @@ async function getDatabases (attributes, resources, endpoint) {
   return display
 }
 
+function escapeProperty (property) {
+  if (property.length !== 2) throw createError(406)
+  return property.map(escapeField)
+}
+
+function escapeField (field) {
+  const trimmed = trimField(field)
+  // zero length is ok
+  return validator.escape(trimmed)
+}
+
 // unescape all names and values in an un-nested object for display
 function unescapeInputs (body) {
-  const escaped = Object.entries(body)
-  const unescaped = {}
+  const escapedEntries = Object.entries(body)
+  const unescapedEntries = escapedEntries.map(unescapeProperty)
+  const unescapedBody = Object.fromEntries(unescapedEntries)
 
-  escaped.forEach(function unescapeProperty (property) {
-    const [key, value] = property.map(function unescapeField (field) {
-      // for now, coerce every key and value into a string
-      field = validator.trim(field + '')
-      // zero length is ok
-      field = validator.unescape(field)
-      return field
-    })
+  return unescapedBody
+}
 
-    unescaped[key] = value
-  })
+function unescapeProperty (property) {
+  if (property.length !== 2) throw createError(406)
+  return property.map(unescapeField)
+}
 
-  return unescaped
+function unescapeField (field) {
+  const trimmed = trimField(field)
+  // zero length is ok
+  return validator.unescape(trimmed)
+}
+
+function trimField (field) {
+  // for now, coerce every key and value into a string
+  return validator.trim(field + '')
 }
