@@ -46,7 +46,7 @@ block content
                 name=attr.name,
                 value=(value === undefined? '' : value)
                 required)
-        else if value === true
+        else if value !== false
           input(id=attr.name,
                 type=attrTypeMap[attr.type],
                 name=attr.name,

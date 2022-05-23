@@ -20,7 +20,7 @@ exports.list = listItems
 
 exports.error = handleError
 
-exports.escape = escapeInputs
+exports.escape = escapeReqBodyInputs
 
 exports.sanitize = sanitizeAttributeTypes
 
@@ -79,10 +79,10 @@ async function readItem (req, res, next) {
 
   try { // read item from database
     const details = await axios.get(endpoint + categoryUrl + idUrl)
-      .then(res => unescapeInputs(res.data)) // queryType parsing optional
-    // TODO: this is bad, but I'm assuming here all data from database came from
-    //       this server, which was escaped, so unescaping it all is ok
-    //       same as listItems
+      .then(res => {
+        const forceEscapedInputs = escapeInputs(res.data) // trust no one
+        return unescapeInputs(forceEscapedInputs)
+      }) // queryType parsing optional
 
     return res.render('detail', {
       title: 'Detail',
@@ -166,8 +166,10 @@ async function listItems (req, res, next) {
 
   try { // read items from database
     const inventory = await axios.get(endpoint + categoryUrl)
-      .then(res => res.data.map(details =>
-        unescapeInputs(details))) // queryType parsing optional
+      .then(res => res.data.map(details => {
+        const forceEscapedInputs = escapeInputs(details)
+        return unescapeInputs(forceEscapedInputs)
+      })) // queryType parsing optional
 
     return res.render('list', {
       title: 'List',
@@ -198,11 +200,8 @@ function handleError (error, req, res, next) {
 }
 
 // escape all names and values from request body json
-function escapeInputs (req, res, next) {
-  const unescapedEntries = Object.entries(req.body)
-  const escapedEntries = unescapedEntries.map(escapeProperty)
-
-  req.body = Object.fromEntries(escapedEntries)
+function escapeReqBodyInputs (req, res, next) {
+  req.body = escapeInputs(req.body)
   return next()
 }
 
@@ -223,8 +222,7 @@ function sanitizeAttributeTypes (req, res, next) {
     if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
       return next(createError(406))
     } else if (attribute.type === 'database') {
-      // ASSUME: value is either undefined or valid ID, or (horrible) escaped string
-      // TODO: check ID?
+      // if ID doesn't exist, database returns 404
     } else if (attribute.type === 'boolean') {
       value = value !== undefined && value !== false
     } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
@@ -310,6 +308,15 @@ async function getDatabases (attributes, resources, endpoint) {
   return display
 }
 
+// escape all names and values in an un-nested object
+function escapeInputs (body) {
+  const unescapedEntries = Object.entries(body)
+  const escapedEntries = unescapedEntries.map(escapeProperty)
+  const escapedBody = Object.fromEntries(escapedEntries)
+
+  return escapedBody
+}
+
 function escapeProperty (property) {
   if (property.length !== 2) throw createError(406)
   return property.map(escapeField)
@@ -318,7 +325,7 @@ function escapeProperty (property) {
 function escapeField (field) {
   const trimmed = trimField(field)
   // zero length is ok
-  return validator.escape(trimmed)
+  return validator.escape(validator.unescape(trimmed)) // force escape
 }
 
 // unescape all names and values in an un-nested object for display
