@@ -4,11 +4,15 @@ const queryType = require('query-types')
 const validator = require('validator')
 const _ = require('underscore')
 
-exports.create = createItem
+exports.create = createItemPOST
+
+exports.createGET = createItemGET
 
 exports.read = readItem
 
-exports.update = updateItem
+exports.update = updateItemPOSTPUT
+
+exports.updateGET = updateItemGET
 
 exports.delete = deleteItem
 
@@ -16,37 +20,43 @@ exports.list = listItems
 
 exports.error = handleError
 
-exports.escape = escapeInputs
+exports.escape = escapeReqBodyInputs
 
-exports.sanitize = sanitizeAttributeTypes
+exports.sanitize = sanitizeReqBodyAttributeTypes
+
+exports.checkID = checkID
+
+exports.stripQuery = stripQueryString
 
 module.exports = exports
 
 /* implementations */
 
-async function createItem (req, res, next) {
+async function createItemPOST (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const categoryUrl = req.baseUrl
 
-  if (req.method === 'POST') {
-    // create item in database
+  try { // create item in database
     const id = await axios.post(endpoint + categoryUrl,
       req.body)
       .then(res => res.data._id)
-      .catch(next)
 
     return res.redirect(categoryUrl + '/' + id)
-  } else if (req.method !== 'GET') {
-    return next(createError(400))
+  } catch (err) {
+    return next(err)
   }
+}
 
+async function createItemGET (req, res, next) {
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
   const resources = req.app.get('resources')
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const attributeTypes = req.app.get('resourceAttributeTypes')
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
 
-  try {
+  try { // populate database attributes
     const databases = await getDatabases(attributes, resources, endpoint)
 
     return res.render('edit', {
@@ -67,49 +77,57 @@ async function readItem (req, res, next) {
   const categoryUrl = req.baseUrl
   const idUrl = '/' + req.params.id
 
-  // read item from database
-  const details = await axios.get(endpoint + categoryUrl + idUrl)
-    .then(res => unescapeInputs(res.data)) // queryType parsing optional
-    .catch(next)
-  // TODO: this is bad, but I'm assuming here all data from database came from
-  //       this server, which was escaped, so unescaping it all is ok
+  try { // read item from database
+    const details = await axios.get(endpoint + categoryUrl + idUrl)
+      .then(res => {
+        const forceEscapedInputs = escapeInputs(res.data) // trust no one
+        return unescapeInputs(forceEscapedInputs)
+      }) // queryType parsing optional
 
-  return res.render('detail', {
-    title: 'Detail',
-    resources,
-    categoryUrl,
-    idUrl,
-    details
-  })
+    return res.render('detail', {
+      title: 'Detail',
+      resources,
+      categoryUrl,
+      idUrl,
+      details
+    })
+  } catch (err) {
+    return next(err)
+  }
 }
 
-async function updateItem (req, res, next) {
+async function updateItemPOSTPUT (req, res, next) {
   const endpoint = req.app.get('endpoint')
   const categoryUrl = req.baseUrl
   const idUrl = '/' + req.params.id
 
-  if (req.method === 'POST' || req.method === 'PUT') {
-    // update item in database
-    return axios.put(endpoint + categoryUrl + idUrl,
+  try { // update item in database
+    await axios.put(endpoint + categoryUrl + idUrl,
       req.body)
-      .then(res.redirect(categoryUrl + idUrl))
-      .catch(next)
-  } else if (req.method !== 'GET') {
-    return next(createError(400))
+    return res.redirect(categoryUrl + idUrl)
+  } catch (err) {
+    return next(err)
   }
+}
 
+async function updateItemGET (req, res, next) {
+  const endpoint = req.app.get('endpoint')
+  const categoryUrl = req.baseUrl
+  const idUrl = '/' + req.params.id
   const resources = req.app.get('resources')
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const attributeTypes = req.app.get('resourceAttributeTypes')
   const resource = resources.find(resource => resource.category === category)
   const attributes = resource.attributes
+  // create two I/O promises
+  const detailsReq = axios.get(endpoint + categoryUrl + idUrl)
+    .then(res => res.data)
+  const databasesReq = getDatabases(attributes, resources, endpoint)
 
-  try {
-    // read item to update from database
-    const details = await axios.get(endpoint + categoryUrl + idUrl)
-      .then(res => queryType.parseObject(unescapeInputs(res.data)))
-      .catch(next)
-    const databases = await getDatabases(attributes, resources, endpoint)
+  try { // read item to update from database and populate database attributes
+    const results = await Promise.all([detailsReq, databasesReq])
+    const details = queryType.parseObject(unescapeInputs(results[0]))
+    const databases = results[1]
 
     return res.render('edit', {
       title: 'Edit',
@@ -129,10 +147,14 @@ async function deleteItem (req, res, next) {
   const categoryUrl = req.baseUrl
   const idUrl = '/' + req.params.id
 
-  // delete item in database
-  return axios.delete(endpoint + categoryUrl + idUrl)
-    .then(res.redirect(categoryUrl))
-    .catch(next)
+  try { // delete item in database
+    // return axios.delete(endpoint + categoryUrl + idUrl)
+    //   .then(res.redirect(categoryUrl)) // this is faster but possibly inaccurate
+    await axios.delete(endpoint + categoryUrl + idUrl)
+    return res.redirect(categoryUrl) // this is slower (depending on database) but accurate
+  } catch (err) {
+    return next(err)
+  }
 }
 
 async function listItems (req, res, next) {
@@ -142,18 +164,23 @@ async function listItems (req, res, next) {
   const category = categoryUrl.slice(categoryUrl.search(/\w/g))
   const detailLevel = req.app.get('resourceListDetailLevel')
 
-  // read items from database
-  const inventory = await axios.get(endpoint + categoryUrl)
-    .then(res => res.data.map(details => unescapeInputs(details))) // queryType parsing optional
-    .catch(next)
+  try { // read items from database
+    const inventory = await axios.get(endpoint + categoryUrl)
+      .then(res => res.data.map(details => {
+        const forceEscapedInputs = escapeInputs(details)
+        return unescapeInputs(forceEscapedInputs)
+      })) // queryType parsing optional
 
-  return res.render('list', {
-    title: 'List',
-    resources,
-    detailLevel,
-    category,
-    inventory
-  })
+    return res.render('list', {
+      title: 'List',
+      resources,
+      detailLevel,
+      category,
+      inventory
+    })
+  } catch (err) {
+    return next(err)
+  }
 }
 
 function handleError (error, req, res, next) {
@@ -173,58 +200,35 @@ function handleError (error, req, res, next) {
 }
 
 // escape all names and values from request body json
-function escapeInputs (req, res, next) {
-  const unescaped = Object.entries(req.body)
-  const escaped = {}
-
-  // TODO: figure out hwo to move these functions out
-  unescaped.forEach(function escapeProperty (property) {
-    const [key, value] = property.map(function escapeField (field) {
-      // for now, coerce every key and value into a string
-      field = validator.trim(field + '')
-      // zero length is ok
-      field = validator.escape(field)
-      return field
-    })
-
-    escaped[key] = value
-  })
-
-  req.body = escaped
-  return next()
+function escapeReqBodyInputs (req, res, next) {
+  try {
+    req.body = escapeInputs(req.body)
+    return next()
+  } catch (err) {
+    return next(err)
+  }
 }
 
 // enforce resource attribute order and types for POST and PUT inputs
-function sanitizeAttributeTypes (req, res, next) {
-  // queryType parses '' as null, and ignores all null values (deletes property)
-  const typedBody = queryType.parseObject(req.body)
+function sanitizeReqBodyAttributeTypes (req, res, next) {
   const resources = req.app.get('resources')
   const categoryUrl = req.baseUrl
-  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
-  const resource = resources.find(resource => resource.category === category)
-  const attributes = resource.attributes
-  const orderedBody = {}
-
-  for (const attribute of attributes) {
-    let value = typedBody[attribute.name]
-
-    if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
-      return next(createError(406))
-    } else if (attribute.type === 'database') {
-      // ASSUME: value is either undefined or valid ID, or (horrible) escaped string
-      // TODO: check ID?
-    } else if (attribute.type === 'boolean') {
-      value = value !== undefined && value !== false
-    } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
-      return next(createError(406))
-    } else if (attribute.type === 'string') {
-      value += ''
-    }
-
-    orderedBody[attribute.name] = value
+  try {
+    req.body = sanitizeAttributeTypes(req.body, resources, categoryUrl)
+    return next()
+  } catch (err) {
+    return next(err)
   }
+}
 
-  req.body = orderedBody
+// naive for now
+function checkID (req, res, next) {
+  if (!validator.isAlphanumeric(req.params.id)) return next(createError(406))
+  return next()
+}
+
+function stripQueryString (req, res, next) {
+  req.query = {}
   return next()
 }
 
@@ -242,6 +246,7 @@ async function getDatabases (attributes, resources, endpoint) {
 
   // I/O: send a 'list' (read all) request to database
   const inventories = await Promise.all(dbRequests)
+  // error uncaught: sent back to caller (updateItem)
 
   const dbResources = dbCategories.map(category =>
     resources.find(resource =>
@@ -275,7 +280,7 @@ async function getDatabases (attributes, resources, endpoint) {
               ? '_id'
               : 'display',
             detail[1]
-          ])) // relabel the display attribute name for view to render
+          ])) // relabel the display attribute name as 'display' for view to render
       .map(details =>
         Object.fromEntries(details))
       .map(details =>
@@ -286,22 +291,77 @@ async function getDatabases (attributes, resources, endpoint) {
   return display
 }
 
+// enforce resource attribute order and types for POST and PUT inputs
+function sanitizeAttributeTypes (body, resources, categoryUrl) {
+  // queryType parses '' as null, and ignores all null values (deletes property)
+  const typedBody = queryType.parseObject(body)
+  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+  const orderedBody = {}
+
+  for (const attribute of attributes) {
+    let value = typedBody[attribute.name]
+
+    if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
+      throw createError(406)
+    } else if (attribute.type === 'database') {
+      // if ID doesn't exist, database returns 404
+    } else if (attribute.type === 'boolean') {
+      value = value !== undefined && value !== false
+    } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
+      throw createError(406)
+    } else if (attribute.type === 'string') {
+      value += ''
+    }
+
+    orderedBody[attribute.name] = value
+  }
+
+  return orderedBody
+}
+
+// escape all names and values in an un-nested object
+function escapeInputs (body) {
+  const unescapedEntries = Object.entries(body)
+  const escapedEntries = unescapedEntries.map(escapeProperty)
+  const escapedBody = Object.fromEntries(escapedEntries)
+
+  return escapedBody
+}
+
+function escapeProperty (property) {
+  if (property.length !== 2) throw createError(406)
+  return property.map(escapeField)
+}
+
+function escapeField (field) {
+  const trimmed = trimField(field)
+  // zero length is ok
+  return validator.escape(validator.unescape(trimmed)) // force escape
+}
+
 // unescape all names and values in an un-nested object for display
 function unescapeInputs (body) {
-  const escaped = Object.entries(body)
-  const unescaped = {}
+  const escapedEntries = Object.entries(body)
+  const unescapedEntries = escapedEntries.map(unescapeProperty)
+  const unescapedBody = Object.fromEntries(unescapedEntries)
 
-  escaped.forEach(function unescapeProperty (property) {
-    const [key, value] = property.map(function unescapeField (field) {
-      // for now, coerce every key and value into a string
-      field = validator.trim(field + '')
-      // zero length is ok
-      field = validator.unescape(field)
-      return field
-    })
+  return unescapedBody
+}
 
-    unescaped[key] = value
-  })
+function unescapeProperty (property) {
+  if (property.length !== 2) throw createError(406)
+  return property.map(unescapeField)
+}
 
-  return unescaped
+function unescapeField (field) {
+  const trimmed = trimField(field)
+  // zero length is ok
+  return validator.unescape(trimmed)
+}
+
+function trimField (field) {
+  // for now, coerce every key and value into a string
+  return validator.trim(field + '')
 }
