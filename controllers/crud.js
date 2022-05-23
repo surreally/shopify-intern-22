@@ -22,7 +22,7 @@ exports.error = handleError
 
 exports.escape = escapeReqBodyInputs
 
-exports.sanitize = sanitizeAttributeTypes
+exports.sanitize = sanitizeReqBodyAttributeTypes
 
 exports.checkID = checkID
 
@@ -201,41 +201,24 @@ function handleError (error, req, res, next) {
 
 // escape all names and values from request body json
 function escapeReqBodyInputs (req, res, next) {
-  req.body = escapeInputs(req.body)
-  return next()
+  try {
+    req.body = escapeInputs(req.body)
+    return next()
+  } catch (err) {
+    return next(err)
+  }
 }
 
 // enforce resource attribute order and types for POST and PUT inputs
-function sanitizeAttributeTypes (req, res, next) {
-  // queryType parses '' as null, and ignores all null values (deletes property)
-  const typedBody = queryType.parseObject(req.body)
+function sanitizeReqBodyAttributeTypes (req, res, next) {
   const resources = req.app.get('resources')
   const categoryUrl = req.baseUrl
-  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
-  const resource = resources.find(resource => resource.category === category)
-  const attributes = resource.attributes
-  const orderedBody = {}
-
-  for (const attribute of attributes) {
-    let value = typedBody[attribute.name]
-
-    if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
-      return next(createError(406))
-    } else if (attribute.type === 'database') {
-      // if ID doesn't exist, database returns 404
-    } else if (attribute.type === 'boolean') {
-      value = value !== undefined && value !== false
-    } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
-      return next(createError(406))
-    } else if (attribute.type === 'string') {
-      value += ''
-    }
-
-    orderedBody[attribute.name] = value
+  try {
+    req.body = sanitizeAttributeTypes(req.body, resources, categoryUrl)
+    return next()
+  } catch (err) {
+    return next(err)
   }
-
-  req.body = orderedBody
-  return next()
 }
 
 // naive for now
@@ -306,6 +289,36 @@ async function getDatabases (attributes, resources, endpoint) {
   // then to produce the final display by combining with labels
   const display = Object.fromEntries(labeledDisplays)
   return display
+}
+
+// enforce resource attribute order and types for POST and PUT inputs
+function sanitizeAttributeTypes (body, resources, categoryUrl) {
+  // queryType parses '' as null, and ignores all null values (deletes property)
+  const typedBody = queryType.parseObject(body)
+  const category = categoryUrl.slice(categoryUrl.search(/\w/g))
+  const resource = resources.find(resource => resource.category === category)
+  const attributes = resource.attributes
+  const orderedBody = {}
+
+  for (const attribute of attributes) {
+    let value = typedBody[attribute.name]
+
+    if (value === undefined && attribute.type !== 'boolean' && attribute.type !== 'database') {
+      throw createError(406)
+    } else if (attribute.type === 'database') {
+      // if ID doesn't exist, database returns 404
+    } else if (attribute.type === 'boolean') {
+      value = value !== undefined && value !== false
+    } else if (attribute.type === 'number' && (!queryType.isNumber(value) || value < 0)) {
+      throw createError(406)
+    } else if (attribute.type === 'string') {
+      value += ''
+    }
+
+    orderedBody[attribute.name] = value
+  }
+
+  return orderedBody
 }
 
 // escape all names and values in an un-nested object
