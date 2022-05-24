@@ -12,11 +12,13 @@ inventory.
   - Items, warehouses, any other category of resources
     - Define resource specifications with `"attributes"`, such as name, quantity and location
   - Resource attribute types, such as string, number and boolean
-    - Kept as is for now
+    - More can be easily defined
+    - Possible to use other tools for this purpose, e.g. [JSON Schema](https://json-schema.org/) (I did not know about Schema when I was developing this project)
   - Resource list detail level (see Usage > List section)
 - Built with Express.js, Node.js, Bootstrap
 - 'Database' supported by [crudcrud.com](https://crudcrud.com)
   - See inventory [here](https://crudcrud.com/Dashboard/101d426af05b43bd93aff1748c721856)
+    - Current CrudCrud endpoint will expire in late June, 2022. But switching instances can be easily done in configuration file
   - See 'Database' section
 
 ## Deploy
